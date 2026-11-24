@@ -15,6 +15,15 @@ type Screen =
   | { kind: "topic"; topicId: TopicId; stepId?: string }
   | { kind: "gallery"; galleryKind: "cube" | "cuboid" };
 type MapView = { topics: MapSummary[]; notice: string | null };
+// prettier-ignore
+type PendingResult = { awaitingAck: true; quizId?: string; correct: boolean; outcome?: string; reasons: string[]; reasonCodes: string[]; reason?: string; hint?: string };
+// prettier-ignore
+type SavedResult = { correct?: boolean; reason?: string; reasonCodes?: string[]; outcome?: string; reasons?: string[] };
+// prettier-ignore
+type NetResults = Record<string,{lastResult:{reasons:readonly string[]}}>;
+type AppProgressStore = Player.ProgressStore & {
+  getPendingResult(topicId: string, quizId: string): PendingResult | null;
+};
 
 const INVALID_ROUTE_NOTICE =
   "선택한 장소를 열 수 없습니다. 지도에서 다시 골라 주세요.";
@@ -68,20 +77,36 @@ function topicSpecFor(topicId: TopicId) {
 
 function toSubmitInput(result: Player.LessonSubmission): store.SubmitInput {
   const reasonCodes = Array.isArray(result.reasonCodes)
-    ? result.reasonCodes.filter((code) => typeof code === "string")
+    ? (result.reasonCodes.filter(
+        (code) => typeof code === "string",
+      ) as string[])
     : undefined;
   return {
     quizId: result.quizId,
     stepId: typeof result.stepId === "string" ? result.stepId : undefined,
     correct: result.correct === true,
-    reason: typeof result.reason === "string" ? result.reason : undefined,
-    reasonCodes: reasonCodes as string[] | undefined,
+    reason: result.reason ?? result.hint,
+    reasonCodes,
     netLayout: result.netLayout as store.SubmitInput["netLayout"],
     exhibit: result.exhibit as store.SubmitInput["exhibit"],
   };
 }
 
-const progressStore: Player.ProgressStore = {
+function pendingResult(record: SavedResult): PendingResult {
+  const reasonCodes = record.reasonCodes ?? record.reasons ?? [];
+  const reason = record.reason ?? reasonCodes[0];
+  return {
+    awaitingAck: true,
+    correct: record.correct ?? record.outcome === "correct",
+    outcome: record.outcome,
+    reason,
+    hint: reason,
+    reasons: [...reasonCodes],
+    reasonCodes: [...reasonCodes],
+  };
+}
+
+const progressStore: AppProgressStore = {
   setStep(topicId, stepId) {
     store.setStep(topicId, stepId);
     return true;
@@ -94,61 +119,45 @@ const progressStore: Player.ProgressStore = {
     store.acknowledgeFeedback(quizId);
     return true;
   },
-  getAcknowledgedQuizIds(topicId) {
+  getPendingResult(topicId, quizId): PendingResult | null {
     try {
-      const results =
-        store.getState().topicStates[topicId as TopicId]?.results ?? {};
-      return Object.entries(results)
-        .filter(([, record]) => record?.firstAcknowledged === true)
-        .map(([quizId]) => quizId);
+      const record =
+        store.getState().topicStates[topicId as TopicId]?.results[quizId];
+      if (record === undefined || !record.awaitingAck) return null;
+      return pendingResult(record.lastResult as SavedResult);
     } catch {
-      return [];
+      return null;
     }
+  },
+  getTopicSummary(topicId) {
+    return store.getTopicSummary(topicId);
+  },
+  isComplete(topicId) {
+    return store.isComplete(topicId);
+  },
+  getNotice() {
+    return store.getNotice();
   },
 };
 
 function netTopicState(topicId: TopicId) {
-  const topicState = store.getState().topicStates[topicId];
-  if (topicState === undefined) return null;
-  const results: Record<
-    string,
-    { lastResult: { reasons: readonly string[] } }
-  > = {};
-  for (const [quizId, record] of Object.entries(topicState.results)) {
-    if (record) {
+  const state = store.getState().topicStates[topicId];
+  if (state === undefined) return null;
+  const results: NetResults = {};
+  for (const [quizId, record] of Object.entries(state.results)) {
+    if (record)
       results[quizId] = { lastResult: { reasons: record.lastResult.reasons } };
-    }
   }
-  return { stepId: topicState.stepId, results };
+  return { stepId: state.stepId, results };
 }
 
-function buildLessons(
-  activeTopicId: TopicId,
-  returnToMap: () => void,
-): Player.LessonRegistry {
-  const netLesson = (props: Player.LessonProps) => (
-    <NetLesson
-      topicId={props.topicId}
-      stepId={props.stepId}
-      quizId={props.quizId}
-      topicState={netTopicState(activeTopicId)}
-      onStepChange={store.setStep}
-      onSubmit={(payload) => props.onSubmit({ ...payload })}
-      onAcknowledge={store.acknowledgeFeedback}
-      onReturnToMap={returnToMap}
-    />
-  );
+function buildLessons(activeTopicId: TopicId): Player.LessonRegistry {
+  // prettier-ignore
+  const netLesson = (props: Player.LessonProps) => (<NetLesson topicId={props.topicId} stepId={props.stepId} quizId={props.quizId} topicState={netTopicState(activeTopicId)} onStepChange={store.setStep} onSubmit={(payload) => props.onSubmit({ ...payload })} onAcknowledge={store.acknowledgeFeedback} />);
   return {
-    SOLID: (props: Player.LessonProps) => (
-      <SolidLesson
-        topicId={props.topicId}
-        stepId={props.stepId}
-        quizId={props.quizId}
-        onSubmit={(result) => props.onSubmit({ ...result })}
-        onReturnToMap={returnToMap}
-      />
-    ),
-    SKETCH: () => <SketchLesson onBackToMap={returnToMap} />,
+    // prettier-ignore
+    SOLID: (props: Player.LessonProps) => (<SolidLesson topicId={props.topicId} stepId={props.stepId} quizId={props.quizId} onSubmit={(result) => props.onSubmit({ ...result })} />),
+    SKETCH: (props: Player.LessonProps) => <SketchLesson {...props} />,
     FACES: (props: Player.LessonProps) => <FacesLesson {...props} />,
     "NET-C": netLesson,
     "NET-R": netLesson,
@@ -198,9 +207,7 @@ export function App(): ReactElement {
   function openGallery(): void {
     let galleryKind: "cube" | "cuboid" = "cube";
     try {
-      if (store.getExhibit("cuboid") !== null) {
-        galleryKind = "cuboid";
-      }
+      if (store.getExhibit("cuboid") !== null) galleryKind = "cuboid";
       setNoticeText(safeNotice());
     } catch {
       setNoticeText(INVALID_ROUTE_NOTICE);
@@ -210,28 +217,15 @@ export function App(): ReactElement {
 
   let content: ReactElement;
   if (screen.kind === "topic") {
-    content = (
-      <TopicPlayer
-        topicId={screen.topicId}
-        resumeStepId={screen.stepId}
-        topicSpec={topicSpecFor(screen.topicId)}
-        store={progressStore}
-        lessons={buildLessons(screen.topicId, returnToMap)}
-        onReturnToMap={returnToMap}
-      />
-    );
+    // prettier-ignore
+    content = (<TopicPlayer topicId={screen.topicId} resumeStepId={screen.stepId} topicSpec={topicSpecFor(screen.topicId)} store={progressStore} lessons={buildLessons(screen.topicId)} onReturnToMap={returnToMap} />);
   } else if (screen.kind === "gallery") {
     content = (
       <Gallery galleryKind={screen.galleryKind} onBackToMap={returnToMap} />
     );
   } else {
-    content = (
-      <WorldMap
-        topics={topics}
-        onOpenTopic={openTopic}
-        onOpenGallery={openGallery}
-      />
-    );
+    // prettier-ignore
+    content = (<WorldMap topics={topics} onOpenTopic={openTopic} onOpenGallery={openGallery} />);
   }
 
   return (
