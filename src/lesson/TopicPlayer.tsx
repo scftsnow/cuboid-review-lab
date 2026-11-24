@@ -169,10 +169,10 @@ export function TopicPlayer({
   if (!lessons || typeof onReturnToMap !== "function") {
     return createElement(ErrorScreen, { notice: CALLBACK_NOTICE });
   }
-
   const catalogTopic = topic;
   const stepLabel = step.label === step.id ? null : step.label;
-  const complete = required.every((quizId) => acknowledged.includes(quizId));
+  // prettier-ignore
+  const complete = required.every((quizId) => acknowledged.includes(quizId) || initialAcknowledged.includes(quizId));
   const alreadyAcknowledged = pending
     ? acknowledged.includes(pending.quizId)
     : false;
