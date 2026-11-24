@@ -76,11 +76,15 @@ function topicSpecFor(topicId: TopicId) {
 }
 
 function toSubmitInput(result: Player.LessonSubmission): store.SubmitInput {
-  const reasonCodes = Array.isArray(result.reasonCodes)
-    ? (result.reasonCodes.filter(
-        (code) => typeof code === "string",
-      ) as string[])
-    : undefined;
+  const codes = Array.isArray(result.reasonCodes) ? result.reasonCodes : [];
+  const reasonCodes = [
+    ...new Set(
+      [...codes, result.reason, result.hint].filter(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0,
+      ),
+    ),
+  ];
   return {
     quizId: result.quizId,
     stepId: typeof result.stepId === "string" ? result.stepId : undefined,
