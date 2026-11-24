@@ -8,7 +8,7 @@ import {
   type SolidKind,
 } from '../geometry/netLayout';
 import { getExhibit, getNotice } from '../progress/store';
-import FoldView, { type FoldViewFoldResult } from '../scene/FoldView';
+import FoldView from '../scene/FoldView';
 
 export type GalleryProps = {
   galleryKind: SolidKind;
@@ -41,25 +41,9 @@ const NET_ISSUE: Record<NetIssueCode, string> = {
   EXTRA_FACE: '면이 많습니다.',
 };
 
-function toFoldViewResult(result: FoldResult): FoldViewFoldResult {
-  const transforms: Record<string, unknown> = {};
-  for (const face of result.faces) {
-    transforms[face.id] = {
-      corners: face.corners,
-      position: face.position,
-      rotation: face.rotation,
-    };
-  }
-  return {
-    ok: result.ok,
-    reasons: result.reasons,
-    correspondence: result.correspondence,
-    transforms,
-  };
-}
-
 export function Gallery({ galleryKind, onBackToMap }: GalleryProps): ReactElement {
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+  const [foldProgress, setFoldProgress] = useState(1);
   const kind = galleryKind === 'cube' || galleryKind === 'cuboid' ? galleryKind : null;
 
   const stored = useMemo(() => {
@@ -92,16 +76,31 @@ export function Gallery({ galleryKind, onBackToMap }: GalleryProps): ReactElemen
   let status = label + ' 전시를 열었습니다.';
   let content: ReactElement;
 
-  const foldView = (layout: NetLayout, result: FoldResult, progress: number): ReactElement => (
+  const foldView = (layout: NetLayout, result: FoldResult): ReactElement => (
     <div data-testid="gallery-exhibit">
       <FoldView
         layout={layout}
-        foldResult={toFoldViewResult(result)}
-        foldProgress={progress}
+        foldResult={result}
+        foldProgress={foldProgress}
         selectedPartId={selectedPartId}
         onSelectPart={setSelectedPartId}
         readOnly
       />
+      <label className="gallery__fold-control">
+        <span>접기 정도</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={foldProgress}
+          aria-label="접기 정도"
+          aria-valuetext={`${Math.round(foldProgress * 100)}% 접기`}
+          data-testid="gallery-fold-slider"
+          onChange={(event) => setFoldProgress(Number(event.currentTarget.value))}
+        />
+        <output>{Math.round(foldProgress * 100)}%</output>
+      </label>
     </div>
   );
 
@@ -142,12 +141,12 @@ export function Gallery({ galleryKind, onBackToMap }: GalleryProps): ReactElemen
       <div className="gallery__message" data-testid="gallery-fold-error" role="alert">
         <p>{status}</p>
         {reasons !== '' && <p>{reasons}</p>}
-        {foldView(stored.layout, fold, 0)}
+        {foldView(stored.layout, fold)}
       </div>
     );
   } else {
     status = '저장된 ' + label + ' 전개도를 같은 면 배치로 다시 접었습니다.';
-    content = foldView(stored.layout, fold, 1);
+    content = foldView(stored.layout, fold);
   }
 
   return (
