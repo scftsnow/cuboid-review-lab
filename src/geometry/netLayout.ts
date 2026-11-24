@@ -1,5 +1,5 @@
 // prettier-ignore
-import { facesTouchAlongFullEdge, isFace, isPoint, isSize, isTurn, partialContact, rectOf, rectsOverlap, type EdgeRef, type FaceSize, type NetFace, type Point2, type Rect, type SharedEdge } from "./netLayoutGeometry";
+import { facesTouchAlongFullEdge, isFace, isPoint, isSize, isTurn, partialContact, rectOf, rectsOverlap, type FaceSize, type NetFace, type Point2, type Rect, type SharedEdge } from "./netLayoutGeometry";
 // prettier-ignore
 export type { EdgeRef, FaceSize, NetFace, Point2, SharedEdge } from "./netLayoutGeometry";
 // prettier-ignore
