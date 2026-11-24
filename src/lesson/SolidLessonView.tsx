@@ -143,9 +143,11 @@ export function SolidLessonView({
             </div>
           ))}
           <p data-testid="solid-selected-count">선택 {selectedIds.length}개</p>
-          <button type="button" data-testid="solid-submit" onClick={onCount}>
-            {step === "count" ? "세기 제출" : "선택 확인"}
-          </button>
+          {step === "count" ? (
+            <button type="button" data-testid="solid-submit" onClick={onCount}>
+              세기 제출
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>
