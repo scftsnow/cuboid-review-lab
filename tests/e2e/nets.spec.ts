@@ -7,6 +7,7 @@ import {
   gotoStep,
   moveFace,
   openTopic,
+  placeFace,
   retryFeedback,
   setFold,
   slideTo,
@@ -70,9 +71,10 @@ test("NET-C and PLAY: cube correspondence, repair, two layouts and exhibit", asy
     "closed",
   );
   await gotoStep(page, "net-c-complete");
-  await moveFace(page, "F1", 5, 5);
-  await submit(page, false, /DISCONNECTED|PARTIAL_EDGE_CONTACT/);
+  await submit(page, false, /INCOMPLETE_FACE_SET/);
   await retryFeedback(page);
+  await placeFace(page, 0, [1, 3, 1]);
+  await setFold(page, true);
   await submit(page, true);
   await acknowledge(page);
   await expect(page.locator("[data-net-lesson]")).toHaveAttribute(
@@ -121,9 +123,10 @@ test("NET-R: cuboid correspondence, repair and two independent layouts", async (
     "closed",
   );
   await gotoStep(page, "net-r-complete");
-  await moveFace(page, "F1", 7, 8);
-  await submit(page, false, /DISCONNECTED|PARTIAL_EDGE_CONTACT/);
+  await submit(page, false, /INCOMPLETE_FACE_SET/);
   await retryFeedback(page);
+  await placeFace(page, 0, [0, 7, 0]);
+  await setFold(page, true);
   await submit(page, true);
   await acknowledge(page);
   await expect(page.locator("[data-net-lesson]")).toHaveAttribute(
