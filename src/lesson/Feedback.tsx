@@ -64,6 +64,7 @@ export function Feedback({
       createElement("p", null, "결과를 표시할 수 없습니다. 문제를 다시 열어 주세요.")
     );
   }
+  const activeQuizId: string = validQuizId;
 
   if (result === null || result === undefined) {
     return createElement(
@@ -92,7 +93,7 @@ export function Feedback({
     if (acknowledged === true) return true;
     if (!acknowledgementAvailable) return false;
     try {
-      const response = onAcknowledge(validQuizId) as unknown;
+      const response = onAcknowledge(activeQuizId) as unknown;
       if (response === false || (isRecord(response) && response.ok === false)) {
         setStoreRejected(true);
         return false;
@@ -107,12 +108,12 @@ export function Feedback({
 
   function handleRetry(): void {
     setStoreRejected(false);
-    if (typeof onRetry === "function") onRetry(validQuizId);
+    if (typeof onRetry === "function") onRetry(activeQuizId);
   }
 
   function handleContinue(): void {
     if (typeof onContinue !== "function") return;
-    if (acknowledge()) onContinue(validQuizId);
+    if (acknowledge()) onContinue(activeQuizId);
   }
 
   function handleReturnToMap(): void {
