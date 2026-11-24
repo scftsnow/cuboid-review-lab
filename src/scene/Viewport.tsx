@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
-import * as THREE from 'three';
-import { attachScenePointer, type ScenePointerGesture } from './pointer';
+import { useEffect, useRef, useState, type ReactElement } from "react";
+import * as THREE from "three";
+import { attachScenePointer, type ScenePointerGesture } from "./pointer";
 
 export interface ViewportErrorInfo {
-  code: 'WEBGL_INIT_FAILED';
+  code: "WEBGL_INIT_FAILED";
   sceneId: string;
   messageKo: string;
 }
@@ -22,7 +22,7 @@ export interface ViewportProps {
 }
 
 type FailureState = {
-  code: 'WEBGL_INIT_FAILED' | 'POINTER_ATTACH_FAILED';
+  code: "WEBGL_INIT_FAILED" | "POINTER_ATTACH_FAILED";
   sceneId: string;
   messageKo: string;
 };
@@ -64,20 +64,20 @@ export function Viewport({
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch {
       setFailure({
-        code: 'WEBGL_INIT_FAILED',
+        code: "WEBGL_INIT_FAILED",
         sceneId,
         messageKo:
           sceneId +
-          ' 장면을 열 수 없습니다. 브라우저의 3D 기능을 확인한 뒤 다시 열어 주세요.',
+          " 장면을 열 수 없습니다. 브라우저의 3D 기능을 확인한 뒤 다시 열어 주세요.",
       });
       return;
     }
 
     const canvas = renderer.domElement;
-    canvas.style.display = 'block';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.touchAction = 'none';
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.touchAction = "none";
     container.appendChild(canvas);
 
     const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 1000);
@@ -108,7 +108,7 @@ export function Viewport({
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
       detachPointer?.();
-      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener("webglcontextlost", handleContextLost);
       renderer.dispose();
       canvas.remove();
     };
@@ -116,9 +116,9 @@ export function Viewport({
     function handleContextLost(event: Event) {
       event.preventDefault();
       setFailure({
-        code: 'WEBGL_INIT_FAILED',
+        code: "WEBGL_INIT_FAILED",
         sceneId,
-        messageKo: sceneId + ' 장면 연결이 끊겼습니다. 다시 열어 주세요.',
+        messageKo: sceneId + " 장면 연결이 끊겼습니다. 다시 열어 주세요.",
       });
       dispose();
     }
@@ -137,16 +137,16 @@ export function Viewport({
     };
 
     const handleGesture = (gesture: ScenePointerGesture) => {
-      if (gesture.kind === 'tap') {
+      if (gesture.kind === "tap") {
         onPickRef.current?.(gesture.pickId);
         return;
       }
-      if (gesture.kind === 'rotate') {
+      if (gesture.kind === "rotate") {
         applyRotation(gesture.deltaX, gesture.deltaY);
       }
     };
 
-    canvas.addEventListener('webglcontextlost', handleContextLost);
+    canvas.addEventListener("webglcontextlost", handleContextLost);
 
     try {
       detachPointer = attachScenePointer({
@@ -157,17 +157,18 @@ export function Viewport({
       });
     } catch {
       setFailure({
-        code: 'POINTER_ATTACH_FAILED',
+        code: "POINTER_ATTACH_FAILED",
         sceneId,
         messageKo:
-          sceneId + ' 장면의 터치 조작을 연결하지 못했습니다. 다시 열어 주세요.',
+          sceneId +
+          " 장면의 터치 조작을 연결하지 못했습니다. 다시 열어 주세요.",
       });
       dispose();
       return;
     }
 
     resize();
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(container);
     }
@@ -196,7 +197,7 @@ export function Viewport({
     retryToken,
   ]);
 
-  const state = !scene ? 'empty' : failure ? 'error' : 'ready';
+  const state = !scene ? "empty" : failure ? "error" : "ready";
 
   return (
     <div
@@ -207,7 +208,12 @@ export function Viewport({
       data-state={state}
       aria-label={ariaLabelKo}
       role="region"
-      style={{ position: 'relative', width: '100%', height: '100%', minHeight: 240 }}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: 240,
+      }}
     >
       {!scene ? (
         <p className="viewport-empty" role="status">
@@ -219,7 +225,10 @@ export function Viewport({
           <strong>{failure.code}</strong>
           <p>{failure.messageKo}</p>
           <p>화면 ID: {failure.sceneId}</p>
-          <button type="button" onClick={() => setRetryToken((value) => value + 1)}>
+          <button
+            type="button"
+            onClick={() => setRetryToken((value) => value + 1)}
+          >
             다시 열기
           </button>
         </div>
