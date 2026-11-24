@@ -1,0 +1,116 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium and WebKit for Playwright
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run repository checks
+        run: npm run check
+
+      - name: Run unit tests
+        run: npm run test
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Run Chromium and WebKit integration tests
+        run: npm run test:e2e
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Verify build output
+        run: |
+          if [ ! -d dist ]; then
+            echo 'BUILD_OUTPUT_EMPTY'
+            exit 1
+          fi
+          if [ -z "$(find dist -mindepth 1 -print -quit)" ]; then
+            echo 'BUILD_OUTPUT_EMPTY'
+            exit 1
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    outputs:
+      url: ${{ steps.verify_url.outputs.url }}
+      deploymentUrl: ${{ steps.verify_url.outputs.url }}
+      sourceCommit: ${{ github.sha }}
+      checks: ${{ needs.build.result }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify deployment URL
+        id: verify_url
+        env:
+          DEPLOY_PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          if [ -z "$DEPLOY_PAGE_URL" ]; then
+            echo 'MISSING_DEPLOY_URL'
+            exit 1
+          fi
+          case "$DEPLOY_PAGE_URL" in
+            https://*) ;;
+            *) echo 'INVALID_DEPLOY_URL'; exit 1 ;;
+          esac
+          case "$DEPLOY_PAGE_URL" in
+            *'?'*|*'#'*) echo 'INVALID_DEPLOY_URL'; exit 1 ;;
+          esac
+          echo "url=$DEPLOY_PAGE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Publish deployment summary
+        env:
+          DEPLOY_URL: ${{ steps.verify_url.outputs.url }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          CHECKS_RESULT: ${{ needs.build.result }}
+        run: |
+          {
+            echo "DEPLOY_URL=$DEPLOY_URL"
+            echo "deploymentUrl=$DEPLOY_URL"
+            echo "sourceCommit=$SOURCE_COMMIT"
+            echo "checks=$CHECKS_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
