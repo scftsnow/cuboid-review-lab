@@ -39,13 +39,9 @@ function quiz(
   reasonCodes: string[],
   acknowledged: boolean,
 ): StoredQuiz {
+  const outcome = correct ? 'correct' : 'incorrect';
   return {
-    lastResult: {
-      quizId,
-      correct,
-      reasonCodes,
-      payload: { outcome: correct ? 'correct' : 'incorrect' },
-    },
+    lastResult: { quizId, correct, reasonCodes, payload: { outcome } },
     awaitingAck: !acknowledged,
     everAcknowledged: acknowledged,
   };
@@ -53,13 +49,10 @@ function quiz(
 
 async function seed(page: Page, snapshot: Snapshot): Promise<void> {
   await page.goto('/');
-  await page.evaluate(
-    ({ key, serialized }) => {
-      localStorage.removeItem(key);
-      localStorage.setItem(key, serialized);
-    },
-    { key: STORAGE_KEY, serialized: JSON.stringify(snapshot) },
-  );
+  await page.evaluate(({ key, serialized }) => {
+    localStorage.removeItem(key);
+    localStorage.setItem(key, serialized);
+  }, { key: STORAGE_KEY, serialized: JSON.stringify(snapshot) });
   await page.reload();
 }
 
@@ -71,9 +64,7 @@ async function readSnapshot(page: Page): Promise<Snapshot> {
 }
 
 async function openPlace(page: Page, topicId: string): Promise<void> {
-  await page
-    .locator('[data-testid="map-place"][data-topic-id="' + topicId + '"]')
-    .tap();
+  await page.locator(`[data-testid="map-place"][data-topic-id="${topicId}"]`).tap();
 }
 
 async function returnToMap(page: Page): Promise<void> {
@@ -83,20 +74,12 @@ async function returnToMap(page: Page): Promise<void> {
 async function foldSignature(page: Page): Promise<string[]> {
   return page
     .locator('[data-testid="gallery-exhibit"] [data-part-id]')
-    .evaluateAll((nodes) =>
-      nodes.map((node) =>
-        [
-          node.getAttribute('data-part-id'),
-          node.getAttribute('data-correspondence-id'),
-          node.getAttribute('points'),
-          node.getAttribute('cx'),
-          node.getAttribute('cy'),
-          node.getAttribute('x1'),
-          node.getAttribute('y1'),
-          node.getAttribute('x2'),
-          node.getAttribute('y2'),
-        ].join(':'),
-      ),
+    .evaluateAll(
+      (nodes, attrs) =>
+        nodes.map((node) =>
+          attrs.map((attr) => node.getAttribute(attr)).join(':'),
+        ),
+      ['data-part-id', 'data-correspondence-id', 'points', 'cx', 'cy', 'x1', 'y1', 'x2', 'y2'],
     );
 }
 
@@ -108,9 +91,7 @@ test('저장된 단계는 지도 왕복과 재접속 후에도 유지된다', as
   });
 
   await openPlace(page, 'SOLID');
-  const step = page.locator(
-    'section[aria-label="주제 학습"][data-topic="SOLID"]',
-  );
+  const step = page.locator('section[aria-label="주제 학습"][data-topic="SOLID"]');
   await expect(step).toHaveAttribute('data-step', 'solid-parts');
 
   await returnToMap(page);
@@ -138,12 +119,8 @@ test('마지막 결과와 확인 여부가 복원되고 완료는 확인 후 표
   });
 
   await openPlace(page, 'FACES');
-  await expect(
-    page.locator('section[aria-label="주제 학습"][data-topic="FACES"]'),
-  ).toHaveAttribute(
-    'data-step',
-    'faces-find',
-  );
+  const step = page.locator('section[aria-label="주제 학습"][data-topic="FACES"]');
+  await expect(step).toHaveAttribute('data-step', 'faces-find');
   await expect(page.getByTestId('topic-complete')).toHaveCount(0);
   const restored = await readSnapshot(page);
   expect(
@@ -179,18 +156,15 @@ test('두 전시 배열은 같은 좌표로 복원되고 오답 후에도 유지
   await expect(page.getByTestId('gallery-status')).toContainText(
     '같은 면 배치로 다시 접었습니다',
   );
-  await expect(page.locator('[data-testid="gallery-exhibit"] .fold-view')).toHaveAttribute(
-    'data-fold-ok',
-    'true',
-  );
+  await expect(
+    page.locator('[data-testid="gallery-exhibit"] .fold-view'),
+  ).toHaveAttribute('data-fold-ok', 'true');
   const before = await foldSignature(page);
 
   await returnToMap(page);
   await openPlace(page, 'NET-R');
   await expect(
-    page.locator(
-      'section[aria-label="주제 학습"][data-topic="NET-R"][data-step="net-r-build"]',
-    ),
+    page.locator('section[aria-label="주제 학습"][data-topic="NET-R"][data-step="net-r-build"]'),
   ).toBeVisible();
   await page.getByTestId('net-submit').tap();
   await expect(page.getByRole('status', { name: '결과 확인' })).toBeVisible();
@@ -248,9 +222,7 @@ test('저장 실패 시 현재 탭은 진행되고 다음 접속에 복원할 �
   await page.reload();
 
   await openPlace(page, 'SOLID');
-  const step = page.locator(
-    'section[aria-label="주제 학습"][data-topic="SOLID"]',
-  );
+  const step = page.locator('section[aria-label="주제 학습"][data-topic="SOLID"]');
   await expect(step).toHaveAttribute('data-step', 'solid-intro');
   await page.getByRole('button', { name: '다음 단계' }).tap();
   await expect(step).toHaveAttribute('data-step', 'solid-classify');
@@ -263,11 +235,7 @@ test('저장 실패 시 현재 탭은 진행되고 다음 접속에 복원할 �
   const nextPage = await page.context().newPage();
   await nextPage.goto('/');
   await openPlace(nextPage, 'SOLID');
-  await expect(
-    nextPage.locator('section[aria-label="주제 학습"][data-topic="SOLID"]'),
-  ).toHaveAttribute(
-    'data-step',
-    'solid-intro',
-  );
+  const nextStep = nextPage.locator('section[aria-label="주제 학습"][data-topic="SOLID"]');
+  await expect(nextStep).toHaveAttribute('data-step', 'solid-intro');
   await nextPage.close();
 });
