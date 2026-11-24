@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  outputDir: "./test-results",
+  outputDir: `./test-results/${process.pid}`,
   use: {
     baseURL: previewUrl,
     trace: "retain-on-failure",
