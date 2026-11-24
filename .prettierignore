@@ -1,0 +1,7 @@
+# Generated artifacts and caches
+dist/
+coverage/
+node_modules/
+playwright-report/
+test-results/
+*.tsbuildinfo
