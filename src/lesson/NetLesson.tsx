@@ -12,6 +12,14 @@ type Topic = "NET-C" | "NET-R";
 type BoardMode = "predict" | "repair" | "partial" | "blank";
 type Outcome = "correct" | "partial" | "incorrect";
 type QuizKind = "net-c-partial" | "net-c-full" | "net-r-partial" | "net-r-full";
+type Selection = { flatPartId: string | null; foldedPartId: string | null };
+// prettier-ignore
+type BoardProps=Omit<Parameters<typeof NetBoard>[0],"highlightedPartIds">&{highlightedPartIds:readonly string[]};
+
+const EMPTY_SELECTION: Selection = { flatPartId: null, foldedPartId: null };
+const HighlightedNetBoard = NetBoard as (
+  props: BoardProps,
+) => ReactElement | null;
 
 // prettier-ignore
 export type NetSubmitPayload = {
@@ -93,52 +101,58 @@ function makeLayout(kind: Kind, stepId: string): NetLayout {
   return { kind, sideLengths, faces: complete };
 }
 // prettier-ignore
+function localId(kind: "edge" | "vertex", faceId: string, index: number): string { return faceId + ":" + kind + ":" + index; }
+// prettier-ignore
 function canonicalLocal(value: string): string {
   const edge = /^([^:]+):e([0-3])$/.exec(value);
-  if (edge) return edge[1] + ":edge:" + edge[2];
+  if (edge) return localId("edge", edge[1], Number(edge[2]));
   const vertex = /^([^:]+):v([0-3])$/.exec(value);
-  if (vertex) return vertex[1] + ":vertex:" + vertex[2];
+  if (vertex) return localId("vertex", vertex[1], Number(vertex[2]));
   return value;
 }
 // prettier-ignore
-function matchesPart(
-  kind: "edge" | "vertex", foldedId: string, faceIds: readonly string[],
-  locals: readonly string[], selected: string
-): boolean {
-  const value = canonicalLocal(selected);
-  const group = selected.startsWith(kind === "edge" ? "E:" : "V:") ? selected.slice(2) : null;
-  return foldedId === selected || locals.includes(value) ||
-    (group !== null && [...faceIds].sort().join(":") === group);
+function groupKey(ids: readonly string[]): string {
+  return [...ids].sort().join(":");
 }
 // prettier-ignore
-function boardIdFor(fold: FoldResult, selected: string): string {
-  const value = canonicalLocal(selected.trim());
-  const face = fold.correspondence.faces.find((item) => item.faceId === value || item.foldedFaceId === value);
-  if (face) return face.faceId;
-  for (const part of fold.correspondence.edges) {
-    const locals = part.positions2d.map((item) => item.faceId + ":edge:" + item.edgeIndex);
-    if (matchesPart("edge", part.foldedEdgeId, part.faceIds, locals, value)) return locals[0] ?? value;
+function resolveSelection(fold: FoldResult, raw: string | null): Selection {
+  const value = typeof raw === "string" && raw.trim() ? canonicalLocal(raw.trim()) : "";
+  if (!value) return EMPTY_SELECTION;
+  for (const item of fold.correspondence.faces) {
+    if (value === item.faceId || value === item.foldedFaceId) {
+      return { flatPartId: item.faceId, foldedPartId: item.foldedFaceId };
+    }
   }
-  for (const part of fold.correspondence.vertices) {
-    const locals = part.positions2d.map((item) => item.faceId + ":vertex:" + item.vertexIndex);
-    if (matchesPart("vertex", part.foldedVertexId, part.faceIds, locals, value)) return locals[0] ?? value;
+  for (const item of fold.correspondence.edges) {
+    const locals = item.positions2d.map((part) => localId("edge", part.faceId, part.edgeIndex));
+    if (value === item.foldedEdgeId || locals.includes(value) || value === "E:" + groupKey(item.faceIds)) {
+      return { flatPartId: locals[0] ?? null, foldedPartId: item.foldedEdgeId };
+    }
   }
-  return value;
+  for (const item of fold.correspondence.vertices) {
+    const locals = item.positions2d.map((part) => localId("vertex", part.faceId, part.vertexIndex));
+    if (value === item.foldedVertexId || locals.includes(value) || value === "V:" + groupKey(item.faceIds)) {
+      return { flatPartId: locals[0] ?? null, foldedPartId: item.foldedVertexId };
+    }
+  }
+  return { flatPartId: value, foldedPartId: null };
 }
 // prettier-ignore
-function highlightedPartIdsOf(fold: FoldResult, selected: string | null): string[] {
-  const value = selected ? boardIdFor(fold, selected) : "";
-  if (!value) return [];
-  const face = fold.correspondence.faces.find((item) => item.faceId === value || item.foldedFaceId === value);
-  if (face) return [face.faceId];
+function highlightedPartIdsOf(fold: FoldResult, selection: Selection): string[] {
+  const flat = selection.flatPartId ? canonicalLocal(selection.flatPartId) : "";
+  const folded = selection.foldedPartId ?? "";
+  if (!flat && !folded) return [];
   const ids: string[] = [];
-  for (const part of fold.correspondence.edges) {
-    const locals = part.positions2d.map((item) => item.faceId + ":edge:" + item.edgeIndex);
-    if (matchesPart("edge", part.foldedEdgeId, part.faceIds, locals, value)) ids.push(...locals);
+  for (const item of fold.correspondence.faces) {
+    if (item.faceId === flat || item.foldedFaceId === folded) ids.push(item.faceId);
   }
-  for (const part of fold.correspondence.vertices) {
-    const locals = part.positions2d.map((item) => item.faceId + ":vertex:" + item.vertexIndex);
-    if (matchesPart("vertex", part.foldedVertexId, part.faceIds, locals, value)) ids.push(...locals);
+  for (const item of fold.correspondence.edges) {
+    const locals = item.positions2d.map((part) => localId("edge", part.faceId, part.edgeIndex));
+    if (folded === item.foldedEdgeId || locals.includes(flat)) ids.push(...locals);
+  }
+  for (const item of fold.correspondence.vertices) {
+    const locals = item.positions2d.map((part) => localId("vertex", part.faceId, part.vertexIndex));
+    if (folded === item.foldedVertexId || locals.includes(flat)) ids.push(...locals);
   }
   return [...new Set(ids)];
 }
@@ -175,17 +189,16 @@ export function NetLesson({
   }, [kind, activeStep]);
 
   const fold = useMemo(() => foldNetLayout(layout), [layout]);
-  const selected = useMemo(
-    () => selectedPartId ? boardIdFor(fold, selectedPartId) : null,
-    [fold, selectedPartId]
-  );
-  const highlightedPartIds = useMemo(() => highlightedPartIdsOf(fold, selected), [fold, selected]);
+  const selection = useMemo(() => resolveSelection(fold, selectedPartId), [fold, selectedPartId]);
+  const selectedFlatPartId = selection.flatPartId;
+  const selectedFoldedPartId = selection.foldedPartId;
+  const highlightedPartIds = useMemo(() => highlightedPartIdsOf(fold, selection), [fold, selection]);
   const stateReasons = topicState?.results?.[quiz?.id ?? ""]?.lastResult?.reasons ?? [];
   const hintText = fold.reasons.map((item) => item.code).join(", ") || stateReasons.join(", ");
 
   function handleSelect(partId: string | null): void {
     const clean = typeof partId === "string" && partId.trim() ? partId.trim() : null;
-    setSelectedPartId(clean === null ? null : boardIdFor(fold, clean));
+    setSelectedPartId(clean);
   }
   function handleSubmit(): void {
     if (!quiz || !onSubmit) return;
@@ -212,8 +225,9 @@ export function NetLesson({
   return (
     <section className="net-lesson" data-net-lesson="" data-topic={topicId} data-step={activeStep}
       data-kind={kind} data-highlighted-part-ids={highlightedPartIds.join("|")}>
-      <NetBoard kind={kind} mode={mode} sideLengths={target.sideLengths} layout={layout}
-        selectedPartId={selected} fixedFaceIds={fixedFaceIds}
+      <HighlightedNetBoard kind={kind} mode={mode} sideLengths={target.sideLengths} layout={layout}
+        selectedPartId={selectedFlatPartId} highlightedPartIds={highlightedPartIds}
+        fixedFaceIds={fixedFaceIds}
         onChange={setLayout} onSelect={handleSelect} onNotice={setNotice} />
       <div className="net-lesson__fold">
         <label>접기 슬라이더
@@ -222,7 +236,7 @@ export function NetLesson({
             onChange={(event) => setFoldProgress(Number(event.target.value))} />
         </label>
         <FoldView layout={layout} foldResult={fold} foldProgress={foldProgress}
-          selectedPartId={selected} onSelectPart={handleSelect} />
+          selectedPartId={selectedFoldedPartId} onSelectPart={handleSelect} />
       </div>
       {notice ? <p role="alert" data-testid="net-notice">{notice}</p> : null}
       {hintText ? <p data-testid="net-hint">{hintText}</p> : null}
