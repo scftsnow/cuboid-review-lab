@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   getSolidExample,
   getSolidTopology,
@@ -8,40 +8,40 @@ import {
   type SolidExample,
   type SolidLabel,
   type SolidResult,
-} from '../../src/geometry/solid';
+} from "../../src/geometry/solid";
 
 type ExpectedExample = Pick<
   SolidExample,
-  'id' | 'kind' | 'label' | 'nameKo' | 'dimensions'
+  "id" | "kind" | "label" | "nameKo" | "dimensions"
 >;
 
 const EXAMPLES: readonly ExpectedExample[] = [
   {
-    id: 'solid-cube',
-    kind: 'cube',
-    label: '정육면체',
-    nameKo: '정육면체',
+    id: "solid-cube",
+    kind: "cube",
+    label: "정육면체",
+    nameKo: "정육면체",
     dimensions: { width: 2, height: 2, depth: 2 },
   },
   {
-    id: 'solid-cuboid',
-    kind: 'cuboid',
-    label: '직육면체',
-    nameKo: '직육면체',
+    id: "solid-cuboid",
+    kind: "cuboid",
+    label: "직육면체",
+    nameKo: "직육면체",
     dimensions: { width: 4, height: 2, depth: 3 },
   },
   {
-    id: 'solid-cone',
-    kind: 'cone',
-    label: '그 외',
-    nameKo: '원뿔',
+    id: "solid-cone",
+    kind: "cone",
+    label: "그 외",
+    nameKo: "원뿔",
     dimensions: null,
   },
   {
-    id: 'solid-triangular-prism',
-    kind: 'triangular-prism',
-    label: '그 외',
-    nameKo: '삼각기둥',
+    id: "solid-triangular-prism",
+    kind: "triangular-prism",
+    label: "그 외",
+    nameKo: "삼각기둥",
     dimensions: null,
   },
 ];
@@ -49,7 +49,7 @@ const EXAMPLES: readonly ExpectedExample[] = [
 function expectOk<T>(result: SolidResult<T>): T {
   expect(result.ok).toBe(true);
   if (!result.ok) {
-    throw new Error('unexpected failure: ' + result.reason);
+    throw new Error("unexpected failure: " + result.reason);
   }
   return result.value;
 }
@@ -98,8 +98,8 @@ function expectCanonicalTopology(topology: BoxTopology): void {
   }
 }
 
-describe('solid examples', () => {
-  it('lists cube, cuboid, cone and triangular prism examples', () => {
+describe("solid examples", () => {
+  it("lists cube, cuboid, cone and triangular prism examples", () => {
     const examples = listSolidExamples();
 
     expect(examples.map(pickExample)).toEqual(EXAMPLES);
@@ -108,32 +108,32 @@ describe('solid examples', () => {
     }
   });
 
-  it('reads every authored example by its exact id', () => {
+  it("reads every authored example by its exact id", () => {
     for (const expected of EXAMPLES) {
       const example = expectOk(getSolidExample(expected.id));
       expect(pickExample(example)).toEqual(expected);
     }
   });
 
-  it('reports unknown example ids without throwing', () => {
-    expect(getSolidExample('')).toEqual({
+  it("reports unknown example ids without throwing", () => {
+    expect(getSolidExample("")).toEqual({
       ok: false,
-      reason: 'UNKNOWN_EXAMPLE',
+      reason: "UNKNOWN_EXAMPLE",
     });
-    expect(getSolidExample('solid-sphere')).toEqual({
+    expect(getSolidExample("solid-sphere")).toEqual({
       ok: false,
-      reason: 'UNKNOWN_EXAMPLE',
+      reason: "UNKNOWN_EXAMPLE",
     });
   });
 });
 
-describe('gradeSolidClassification', () => {
-  it('accepts the expected label for all four examples', () => {
+describe("gradeSolidClassification", () => {
+  it("accepts the expected label for all four examples", () => {
     const selections: ReadonlyArray<readonly [string, SolidLabel]> = [
-      ['solid-cube', '정육면체'],
-      ['solid-cuboid', '직육면체'],
-      ['solid-cone', '그 외'],
-      ['solid-triangular-prism', '그 외'],
+      ["solid-cube", "정육면체"],
+      ["solid-cuboid", "직육면체"],
+      ["solid-cone", "그 외"],
+      ["solid-triangular-prism", "그 외"],
     ];
 
     for (const [id, selected] of selections) {
@@ -146,54 +146,52 @@ describe('gradeSolidClassification', () => {
     }
   });
 
-  it('marks a mismatched cuboid selection incorrect', () => {
+  it("marks a mismatched cuboid selection incorrect", () => {
     expect(
-      expectOk(gradeSolidClassification('solid-cuboid', '정육면체')),
+      expectOk(gradeSolidClassification("solid-cuboid", "정육면체")),
     ).toEqual({
-      expected: '직육면체',
-      selected: '정육면체',
+      expected: "직육면체",
+      selected: "정육면체",
       correct: false,
     });
   });
 
-  it('rejects invalid selections and unknown examples', () => {
-    expect(gradeSolidClassification('solid-cube', '' as SolidLabel)).toEqual({
+  it("rejects invalid selections and unknown examples", () => {
+    expect(gradeSolidClassification("solid-cube", "" as SolidLabel)).toEqual({
       ok: false,
-      reason: 'INVALID_SELECTION',
+      reason: "INVALID_SELECTION",
     });
-    expect(gradeSolidClassification('missing', '그 외')).toEqual({
+    expect(gradeSolidClassification("missing", "그 외")).toEqual({
       ok: false,
-      reason: 'UNKNOWN_EXAMPLE',
+      reason: "UNKNOWN_EXAMPLE",
     });
   });
 });
 
-describe('getSolidTopology', () => {
-  it('returns canonical counts and unique IDs for cube and cuboid', () => {
-    for (const id of ['solid-cube', 'solid-cuboid']) {
+describe("getSolidTopology", () => {
+  it("returns canonical counts and unique IDs for cube and cuboid", () => {
+    for (const id of ["solid-cube", "solid-cuboid"]) {
       expectCanonicalTopology(expectOk(getSolidTopology(id)));
     }
   });
 
-  it('distinguishes cube faces from non-cubic cuboid faces', () => {
-    const cube = expectOk(getSolidTopology('solid-cube'));
-    const cuboid = expectOk(getSolidTopology('solid-cuboid'));
+  it("distinguishes cube faces from non-cubic cuboid faces", () => {
+    const cube = expectOk(getSolidTopology("solid-cube"));
+    const cuboid = expectOk(getSolidTopology("solid-cuboid"));
 
-    expect(cube.faces.every((face) => face.shape === 'square')).toBe(true);
+    expect(cube.faces.every((face) => face.shape === "square")).toBe(true);
     expect(cube.faces.every((face) => face.size[0] === face.size[1])).toBe(
       true,
     );
-    expect(cuboid.faces.every((face) => face.shape === 'rectangle')).toBe(
-      true,
-    );
+    expect(cuboid.faces.every((face) => face.shape === "rectangle")).toBe(true);
     expect(cuboid.faces.some((face) => face.size[0] !== face.size[1])).toBe(
       true,
     );
   });
 
-  it('uses the same stable ID sets for cube and cuboid', () => {
-    const cube = expectOk(getSolidTopology('solid-cube'));
-    const cuboid = expectOk(getSolidTopology('solid-cuboid'));
+  it("uses the same stable ID sets for cube and cuboid", () => {
+    const cube = expectOk(getSolidTopology("solid-cube"));
+    const cuboid = expectOk(getSolidTopology("solid-cuboid"));
 
     expect(new Set(cube.faces.map((face) => face.id))).toEqual(
       new Set(cuboid.faces.map((face) => face.id)),
@@ -206,19 +204,19 @@ describe('getSolidTopology', () => {
     );
   });
 
-  it('rejects unsupported cone and triangular prism topology', () => {
-    for (const id of ['solid-cone', 'solid-triangular-prism']) {
+  it("rejects unsupported cone and triangular prism topology", () => {
+    for (const id of ["solid-cone", "solid-triangular-prism"]) {
       expect(getSolidTopology(id)).toEqual({
         ok: false,
-        reason: 'UNSUPPORTED_TOPOLOGY',
+        reason: "UNSUPPORTED_TOPOLOGY",
       });
     }
   });
 
-  it('rejects unknown topology ids without throwing', () => {
-    expect(getSolidTopology('')).toEqual({
+  it("rejects unknown topology ids without throwing", () => {
+    expect(getSolidTopology("")).toEqual({
       ok: false,
-      reason: 'UNKNOWN_EXAMPLE',
+      reason: "UNKNOWN_EXAMPLE",
     });
   });
 });
