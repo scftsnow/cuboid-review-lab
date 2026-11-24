@@ -1,9 +1,9 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 export type ScenePointerGesture =
-  | { kind: 'tap'; pickId: string | null }
-  | { kind: 'rotate'; deltaX: number; deltaY: number }
-  | { kind: 'cancel' };
+  | { kind: "tap"; pickId: string | null }
+  | { kind: "rotate"; deltaX: number; deltaY: number }
+  | { kind: "cancel" };
 
 export type AttachScenePointerOptions = {
   element: HTMLElement;
@@ -14,25 +14,27 @@ export type AttachScenePointerOptions = {
 };
 
 function hasPickId(node: THREE.Object3D): boolean {
-  return Object.prototype.hasOwnProperty.call(node.userData, 'pickId');
+  return Object.prototype.hasOwnProperty.call(node.userData, "pickId");
 }
 
-export function attachScenePointer(options: AttachScenePointerOptions): () => void {
+export function attachScenePointer(
+  options: AttachScenePointerOptions,
+): () => void {
   const { element, camera, pickables, onGesture } = options;
 
   if (!element) {
-    throw new TypeError('attachScenePointer requires an element');
+    throw new TypeError("attachScenePointer requires an element");
   }
   if (!camera) {
-    throw new TypeError('attachScenePointer requires a camera');
+    throw new TypeError("attachScenePointer requires a camera");
   }
-  if (typeof onGesture !== 'function') {
-    throw new TypeError('attachScenePointer requires onGesture');
+  if (typeof onGesture !== "function") {
+    throw new TypeError("attachScenePointer requires onGesture");
   }
 
   const pickableObjects = Array.isArray(pickables) ? [...pickables] : [];
   const threshold =
-    typeof options.dragThresholdPx === 'number' && options.dragThresholdPx >= 0
+    typeof options.dragThresholdPx === "number" && options.dragThresholdPx >= 0
       ? options.dragThresholdPx
       : 8;
   const raycaster = new THREE.Raycaster();
@@ -60,7 +62,9 @@ export function attachScenePointer(options: AttachScenePointerOptions): () => vo
       while (node) {
         if (hasPickId(node)) {
           const pickId = node.userData.pickId;
-          return typeof pickId === 'string' && pickId.length > 0 ? pickId : null;
+          return typeof pickId === "string" && pickId.length > 0
+            ? pickId
+            : null;
         }
         node = node.parent;
       }
@@ -106,10 +110,10 @@ export function attachScenePointer(options: AttachScenePointerOptions): () => vo
     finishPointer();
 
     if (becameDrag) {
-      onGesture({ kind: 'rotate', deltaX, deltaY });
+      onGesture({ kind: "rotate", deltaX, deltaY });
       return;
     }
-    onGesture({ kind: 'tap', pickId: pickAt(event.clientX, event.clientY) });
+    onGesture({ kind: "tap", pickId: pickAt(event.clientX, event.clientY) });
   }
 
   function onPointerCancel(event: PointerEvent): void {
@@ -117,18 +121,18 @@ export function attachScenePointer(options: AttachScenePointerOptions): () => vo
       return;
     }
     finishPointer();
-    onGesture({ kind: 'cancel' });
+    onGesture({ kind: "cancel" });
   }
 
-  element.addEventListener('pointerdown', onPointerDown);
-  element.addEventListener('pointermove', onPointerMove);
-  element.addEventListener('pointerup', onPointerUp);
-  element.addEventListener('pointercancel', onPointerCancel);
+  element.addEventListener("pointerdown", onPointerDown);
+  element.addEventListener("pointermove", onPointerMove);
+  element.addEventListener("pointerup", onPointerUp);
+  element.addEventListener("pointercancel", onPointerCancel);
 
   return () => {
-    element.removeEventListener('pointerdown', onPointerDown);
-    element.removeEventListener('pointermove', onPointerMove);
-    element.removeEventListener('pointerup', onPointerUp);
-    element.removeEventListener('pointercancel', onPointerCancel);
+    element.removeEventListener("pointerdown", onPointerDown);
+    element.removeEventListener("pointermove", onPointerMove);
+    element.removeEventListener("pointerup", onPointerUp);
+    element.removeEventListener("pointercancel", onPointerCancel);
   };
 }
