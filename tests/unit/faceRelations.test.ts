@@ -140,13 +140,12 @@ describe("FACES face relations", () => {
         continue;
       }
 
-      const expectedOpposite = [...descriptors.values()]
-        .find(
-          (candidate) =>
-            candidate.id !== baseFaceId &&
-            candidate.axis === descriptor.axis &&
-            candidate.value !== descriptor.value,
-        );
+      const expectedOpposite = [...descriptors.values()].find(
+        (candidate) =>
+          candidate.id !== baseFaceId &&
+          candidate.axis === descriptor.axis &&
+          candidate.value !== descriptor.value,
+      );
       expect(expectedOpposite).toBeDefined();
       if (!expectedOpposite) {
         continue;
