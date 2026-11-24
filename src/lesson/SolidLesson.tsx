@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactElement } from "react";
 import * as THREE from "three";
 import { getSolidTopology, listSolidExamples, type SolidExample } from "../geometry/solid";
+import { buildSolidScene as buildBoxScene } from "../scene/solidScene";
 import { Viewport } from "../scene/Viewport";
 import { TOPICS } from "./topics";
 export type { SolidExample };
@@ -82,53 +83,17 @@ function gradeSelection(example: SolidExample | null, selected: readonly string[
   return { correct: reasonCode === null && counts.faces === 6 && counts.edges === 12 && counts.vertices === 8, expected, selectedIds: [...unique], counts: compact(duplicates > 0 ? counts : full), deduplicatedIds: duplicates > 0 ? unique.size : undefined, reasonCode };
 }
 
-function pickable(id: string, geometry: THREE.BufferGeometry, color: number, opacity = 1) {
-  const object = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, side: THREE.DoubleSide }));
-  object.userData.pickId = id;
-  return object;
-}
-
-function buildSolidScene(example: SolidExample | null) {
+function createLessonScene(example: SolidExample | null) {
+  const topology = example ? getSolidTopology(example.id) : null;
+  if (topology?.ok) return buildBoxScene(topology.value);
   const scene = new THREE.Scene();
-  const pickables: THREE.Object3D[] = [];
-  const result = example ? getSolidTopology(example.id) : null;
-  const topology = result?.ok ? result.value : null;
-  if (!topology) {
-    const geometry = example?.kind === "cone" ? new THREE.ConeGeometry(0.85, 1.7, 24) : new THREE.CylinderGeometry(0.8, 0.8, 1.7, 3);
-    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x9cc6ff, wireframe: true })));
-    return { scene, pickables };
-  }
-  const positions = new Map(topology.vertices.map((vertex) => [vertex.id, vertex.position]));
-  const point = (id: string) => {
-    const [x, y, z] = positions.get(id) ?? [0, 0, 0];
-    return new THREE.Vector3((x - 0.5) * 1.5, (y - 0.5) * 1.5, (z - 0.5) * 1.5);
-  };
-  for (const face of topology.faces) {
-    const values = face.vertexIds.flatMap((id) => { const p = point(id); return [p.x, p.y, p.z]; });
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(values, 3));
-    geometry.setIndex([0, 1, 2, 0, 2, 3]);
-    geometry.computeVertexNormals();
-    const part = pickable(face.id, geometry, 0x74c7ff, 0.28); scene.add(part); pickables.push(part);
-  }
-  const up = new THREE.Vector3(0, 1, 0);
-  for (const edge of topology.edges) {
-    const a = point(edge.endpoints[0]);
-    const b = point(edge.endpoints[1]);
-    const direction = b.clone().sub(a);
-    const part = pickable(edge.id, new THREE.CylinderGeometry(0.04, 0.04, direction.length(), 8), 0x163b57);
-    part.position.copy(a).add(b).multiplyScalar(0.5); part.quaternion.setFromUnitVectors(up, direction.normalize());
-    scene.add(part); pickables.push(part);
-  }
-  for (const vertex of topology.vertices) {
-    const part = pickable(vertex.id, new THREE.SphereGeometry(0.09, 12, 12), 0xffc857);
-    part.position.copy(point(vertex.id)); scene.add(part); pickables.push(part);
-  }
-  return { scene, pickables };
+  const geometry = example?.kind === "cone" ? new THREE.ConeGeometry(0.85, 1.7, 24) : new THREE.CylinderGeometry(0.8, 0.8, 1.7, 3);
+  if (example) scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x9cc6ff, wireframe: true })));
+  return { scene, pickables: [] as THREE.Object3D[] };
 }
 
 export function SolidLesson(props: Props): ReactElement {
-  const [exampleId, setExampleId] = useState<string | null>(null);
+  const [exampleId, setExampleId] = useState<string | null>(() => props.examples?.find((item) => item.kind === "cuboid")?.id ?? "solid-cuboid");
   const [answer, setAnswer] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [feedback, setFeedback] = useState<Result | null>(null);
@@ -140,7 +105,7 @@ export function SolidLesson(props: Props): ReactElement {
   const step = stepOf(props.stepId) || internalStep;
   const example = examples.find((item) => item.id === exampleId) ?? null;
   const parts = topologyParts(example);
-  const { scene, pickables } = useMemo(() => buildSolidScene(example), [example]);
+  const { scene, pickables } = useMemo(() => createLessonScene(example), [example]);
   const interactiveIds = new Set([...parts.face, ...parts.edge, ...parts.vertex]);
   const expected = example?.label ?? example?.nameKo ?? "";
   const invalidTopic = !checkTopic(props.topics);
@@ -186,6 +151,17 @@ export function SolidLesson(props: Props): ReactElement {
       {step === "definition" ? (
         <div data-testid="solid-step-content">
           <p>직육면체는 여섯 개의 직사각형 면으로, 정육면체는 같은 크기의 정사각형 여섯 개로 둘러싸인 입체입니다. 돌려 보아도 면 6개, 모서리 12개, 꼭짓점 8개는 같습니다.</p>
+          <p data-testid="solid-parts-explanation">면은 도형의 넓은 겉면, 모서리는 두 면이 만나는 선, 꼭짓점은 세 모서리가 만나는 점입니다.</p>
+          <div role="group" aria-label="관찰할 도형">
+            {examples.filter((item) => item.kind === "cube" || item.kind === "cuboid").map((item) => (
+              <button key={item.id} type="button" data-testid={"solid-observe-" + item.id} aria-pressed={item.id === exampleId} onClick={() => { setExampleId(item.id); setSelectedIds([]); setFeedback(null); }}>
+                {item.nameKo ?? item.label ?? item.id}
+              </button>
+            ))}
+          </div>
+          <div data-testid="solid-viewport" style={{ height: 240 }}>
+            <Viewport sceneId={"solid-" + (example?.id ?? "none")} scene={scene} camera={{ position: [3, 2.4, 3], target: [0, 0, 0], fov: 45 }} pickables={[]} onPick={handlePick} ariaLabelKo="도형을 돌려 보고 면, 모서리, 꼭짓점을 미리 볼 수 있습니다" />
+          </div>
           {!props.stepId && <button type="button" onClick={() => { setInternalStep("classify"); callbacks.onStepChange?.("classify"); }}>분류 활동으로 이동</button>}
         </div>
       ) : (
@@ -213,6 +189,7 @@ export function SolidLesson(props: Props): ReactElement {
             </div>
           ) : (
             <div>
+              <p data-testid="solid-parts-explanation">면은 도형의 넓은 겉면, 모서리는 두 면이 만나는 선, 꼭짓점은 세 모서리가 만나는 점입니다.</p>
               {KINDS.map((kind) => (
                 <div key={kind}>
                   <h3>{kind === "face" ? "면" : kind === "edge" ? "모서리" : "꼭짓점"}</h3>
