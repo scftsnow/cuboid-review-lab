@@ -39,7 +39,9 @@ const CLASSIFICATIONS = [
   { id: "solid-cone", label: "그 외" },
 ] as const;
 
-async function isVisible(locator: ReturnType<Page["getByTestId"]>): Promise<boolean> {
+async function isVisible(
+  locator: ReturnType<Page["getByTestId"]>,
+): Promise<boolean> {
   return locator.isVisible().catch(() => false);
 }
 
@@ -55,8 +57,15 @@ function quizFeedback(page: Page) {
   return page.getByRole("status", { name: "결과 확인" });
 }
 
-async function advanceUntil(page: Page, target: ReturnType<Page["getByTestId"]>): Promise<void> {
-  for (let attempt = 0; attempt < 8 && !(await isVisible(target)); attempt += 1) {
+async function advanceUntil(
+  page: Page,
+  target: ReturnType<Page["getByTestId"]>,
+): Promise<void> {
+  for (
+    let attempt = 0;
+    attempt < 8 && !(await isVisible(target));
+    attempt += 1
+  ) {
     const next = page.getByRole("button", { name: "다음 단계" });
     if (!(await isVisible(next))) break;
     await next.click();
@@ -93,7 +102,10 @@ test("분류 확인 후 구성 요소를 회전 전후 같은 ID로 세고 두 �
   if (await isVisible(directLink)) {
     await directLink.click();
   } else {
-    await page.getByRole("button", { name: /직육면체|정육면체/ }).first().click();
+    await page
+      .getByRole("button", { name: /직육면체|정육면체/ })
+      .first()
+      .click();
   }
   await expect(page.locator('[data-topic="SOLID"]')).toBeVisible();
   await expect(page.locator('[data-testid^="solid-part-"]')).toHaveCount(0);
@@ -137,7 +149,9 @@ test("분류 확인 후 구성 요소를 회전 전후 같은 ID로 세고 두 �
       .getByTestId(`solid-part-${id}`)
       .evaluate((node) => (node as HTMLElement).click());
   }
-  await expect(page.getByTestId("solid-selected-count")).toHaveText("선택 26개");
+  await expect(page.getByTestId("solid-selected-count")).toHaveText(
+    "선택 26개",
+  );
   await page.getByTestId("solid-submit").click();
   await expect(quizFeedback(page)).toBeVisible();
   await expect(quizFeedback(page)).toContainText("정답입니다");
