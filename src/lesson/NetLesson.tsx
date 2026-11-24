@@ -13,13 +13,8 @@ type BoardMode = "predict" | "repair" | "partial" | "blank";
 type Outcome = "correct" | "partial" | "incorrect";
 type QuizKind = "net-c-partial" | "net-c-full" | "net-r-partial" | "net-r-full";
 type Selection = { flatPartId: string | null; foldedPartId: string | null };
-// prettier-ignore
-type BoardProps=Omit<Parameters<typeof NetBoard>[0],"highlightedPartIds">&{highlightedPartIds:readonly string[]};
 
 const EMPTY_SELECTION: Selection = { flatPartId: null, foldedPartId: null };
-const HighlightedNetBoard = NetBoard as (
-  props: BoardProps,
-) => ReactElement | null;
 
 // prettier-ignore
 export type NetSubmitPayload = {
@@ -175,43 +170,47 @@ export function NetLesson({
   const target = { kind, sideLengths: kind === "cube" ? [1, 1, 1] as const : [2, 3, 4] as const };
 
   const [layout, setLayout] = useState<NetLayout>(() => makeLayout(kind, activeStep));
-  const [selectedPartId, setSelectedPartId] = useState<string | null>(
-    activeStep.endsWith("correspond") ? "F1" : null
-  );
+  const [selection, setSelection] = useState<Selection>(activeStep.endsWith("correspond")
+    ? resolveSelection(foldNetLayout(makeLayout(kind, activeStep)), "F1") : EMPTY_SELECTION);
   const [foldProgress, setFoldProgress] = useState(activeStep.endsWith("correspond") ? 1 : 0);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setLayout(makeLayout(kind, activeStep));
-    setSelectedPartId(activeStep.endsWith("correspond") ? "F1" : null);
+    setSelection(activeStep.endsWith("correspond")
+      ? resolveSelection(foldNetLayout(makeLayout(kind, activeStep)), "F1") : EMPTY_SELECTION);
     setFoldProgress(activeStep.endsWith("correspond") ? 1 : 0);
     setNotice(null);
   }, [kind, activeStep]);
 
   const fold = useMemo(() => foldNetLayout(layout), [layout]);
-  const selection = useMemo(() => resolveSelection(fold, selectedPartId), [fold, selectedPartId]);
-  const selectedFlatPartId = selection.flatPartId;
-  const selectedFoldedPartId = selection.foldedPartId;
-  const highlightedPartIds = useMemo(() => highlightedPartIdsOf(fold, selection), [fold, selection]);
+  const activeSelection = useMemo(() => selection.flatPartId || selection.foldedPartId
+    ? resolveSelection(fold, selection.flatPartId ?? selection.foldedPartId) : EMPTY_SELECTION, [fold, selection]);
+  const selectedFlatPartId = activeSelection.flatPartId;
+  const selectedFoldedPartId = activeSelection.foldedPartId;
+  const highlightedPartIds = highlightedPartIdsOf(fold, activeSelection);
   const stateReasons = topicState?.results?.[quiz?.id ?? ""]?.lastResult?.reasons ?? [];
   const hintText = fold.reasons.map((item) => item.code).join(", ") || stateReasons.join(", ");
 
   function handleSelect(partId: string | null): void {
     const clean = typeof partId === "string" && partId.trim() ? partId.trim() : null;
-    setSelectedPartId(clean);
+    setSelection(clean ? resolveSelection(fold, clean) : EMPTY_SELECTION);
   }
   function handleSubmit(): void {
     if (!quiz || !onSubmit) return;
-    const result = gradeNet(layout, target, mode === "partial" ? "partial" : "complete");
-    const outcome: Outcome = result.ok ? "correct" : mode === "partial" && result.complete ? "partial" : "incorrect";
+    const result = gradeNet(layout, target, "complete");
+    const missingFace = mode === "partial" && result.reasons.length === 1
+      && result.reasons[0] === "INCOMPLETE_FACE_SET";
+    const correct = result.ok && result.closed;
+    const outcome: Outcome = correct ? "correct" : missingFace ? "partial" : "incorrect";
     const payload: NetSubmitPayload = {
       topicId, quizId: quiz.id, kind: quizKindOf(activeTopic, mode), layout,
       result: { ...result, outcome },
-      correct: result.ok,
+      correct,
       reason: result.reasons.join(", ") || undefined,
       hint: result.hints.map((item) => HINTS[item.code] ?? item.code).join(" ") || undefined,
       netLayout: layout,
-      exhibit: mode === "blank" && result.ok ? { kind, layout } : undefined,
+      exhibit: mode === "blank" && correct ? { kind, layout } : undefined,
     };
     onSubmit(payload);
   }
@@ -225,7 +224,7 @@ export function NetLesson({
   return (
     <section className="net-lesson" data-net-lesson="" data-topic={topicId} data-step={activeStep}
       data-kind={kind} data-highlighted-part-ids={highlightedPartIds.join("|")}>
-      <HighlightedNetBoard kind={kind} mode={mode} sideLengths={target.sideLengths} layout={layout}
+      <NetBoard kind={kind} mode={mode} sideLengths={target.sideLengths} layout={layout}
         selectedPartId={selectedFlatPartId} highlightedPartIds={highlightedPartIds}
         fixedFaceIds={fixedFaceIds}
         onChange={setLayout} onSelect={handleSelect} onNotice={setNotice} />
