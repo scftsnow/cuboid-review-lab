@@ -72,7 +72,10 @@ function toggleSelection(current: Selections, category: FaceCategory, id: string
 
 export default function FacesLesson({ stepId, quizId, onSubmit }: LessonProps) {
   const quiz = resolveQuiz(quizId, stepId);
-  const mode: Mode = quiz?.kind === "face-relation" ? "relation" : "base";
+  const mode: Mode =
+    stepId === "faces-relations" || quiz?.kind === "face-relation"
+      ? "relation"
+      : "base";
   const quizUnavailable = Boolean(quizId && !quiz);
   const [solidKind, setSolidKind] = useState<BoxKind>("cuboid");
   const [baseFaceId, setBaseFaceId] = useState("fFront");
