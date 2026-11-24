@@ -11,6 +11,36 @@ async function highlightIds(page: Page): Promise<string[]> {
     );
 }
 
+async function expectedHighlights(page: Page): Promise<string[]> {
+  const raw =
+    (await page
+      .locator("[data-net-lesson]")
+      .getAttribute("data-highlighted-part-ids")) ?? "";
+  return raw.split("|").filter(Boolean);
+}
+
+async function expectCorrespondence(
+  page: Page,
+  selectedId: string,
+  kind: "face" | "edge" | "vertex",
+  minimum: number,
+): Promise<void> {
+  expect(selectedId).toBeTruthy();
+  await expect(page.locator(".fold-view")).toHaveAttribute(
+    "data-selected-part-id",
+    selectedId,
+  );
+  const expected = await expectedHighlights(page);
+  expect(await highlightIds(page)).toEqual(expected);
+  expect(expected.length).toBeGreaterThanOrEqual(minimum);
+  if (kind === "face") {
+    expect(expected.every((id) => !id.includes(":"))).toBe(true);
+  } else {
+    const suffix = `:${kind}:`;
+    expect(expected.every((id) => id.includes(suffix))).toBe(true);
+  }
+}
+
 export async function openTopic(page: Page, topic: Topic): Promise<void> {
   await page.goto("/");
   await page.locator(`[data-topic-id="${topic}"]`).click();
@@ -123,32 +153,47 @@ export async function checkCorrespondence(
   page: Page,
   vertexMinimum: number,
 ): Promise<void> {
+  const folded = page.locator(".fold-view");
   await expect(page.locator(".fold-view")).toHaveAttribute(
     "data-fold-state",
     "closed",
   );
   await page.locator('[data-board-action="clear-selection"]').click();
   expect(await highlightIds(page)).toEqual([]);
+  await expect(folded).toHaveAttribute("data-selected-part-id", "");
   await page
     .locator('g.net-board[data-face-id="F1"] rect.net-face-shape')
     .dispatchEvent("click");
-  await expect(page.getByTestId("fold-face-F1")).toHaveClass(/is-highlighted/);
-  await page.getByTestId("fold-face-F2").dispatchEvent("click");
+  const firstFace = folded.locator('[data-testid="fold-face-F1"]');
+  await expect(firstFace).toHaveClass(/is-highlighted/);
+  await expectCorrespondence(
+    page,
+    (await firstFace.getAttribute("data-correspondence-id")) ?? "",
+    "face",
+    1,
+  );
+  const secondFace = folded.locator('[data-testid="fold-face-F2"]');
+  const secondFaceId =
+    (await secondFace.getAttribute("data-correspondence-id")) ?? "";
+  await secondFace.dispatchEvent("click");
+  await expectCorrespondence(page, secondFaceId, "face", 1);
   await expect(
     page.locator('g.net-board[data-face-id="F2"][data-highlighted-2d]'),
   ).toHaveCount(1);
-  await page
-    .locator('line[data-testid^="fold-edge-"][data-part-id^="E:"]')
-    .first()
-    .dispatchEvent("click");
-  expect((await highlightIds(page)).length).toBeGreaterThanOrEqual(2);
-  await page
-    .locator('circle[data-testid^="fold-vertex-"][data-part-id^="V:"]')
-    .first()
-    .dispatchEvent("click");
-  expect((await highlightIds(page)).length).toBeGreaterThanOrEqual(
-    vertexMinimum,
-  );
+  const edge = folded
+    .locator('line[data-testid^="fold-edge-"][data-correspondence-id^="edge:"]')
+    .first();
+  const edgeId = (await edge.getAttribute("data-correspondence-id")) ?? "";
+  await edge.dispatchEvent("click");
+  await expectCorrespondence(page, edgeId, "edge", 2);
+  const vertex = folded
+    .locator(
+      'circle[data-testid^="fold-vertex-"][data-correspondence-id^="vertex:"]',
+    )
+    .first();
+  const vertexId = (await vertex.getAttribute("data-correspondence-id")) ?? "";
+  await vertex.dispatchEvent("click");
+  await expectCorrespondence(page, vertexId, "vertex", vertexMinimum);
 }
 
 export async function foldSignature(page: Page): Promise<string> {
