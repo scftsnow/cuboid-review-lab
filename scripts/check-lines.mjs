@@ -25,6 +25,8 @@ const EXCLUDED_DIRECTORIES = new Set([
   "coverage",
   "dist",
   "node_modules",
+  "playwright-report",
+  "test-results",
 ]);
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
