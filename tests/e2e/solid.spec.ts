@@ -124,11 +124,12 @@ test("분류 확인 후 구성 요소를 회전 전후 같은 ID로 세고 두 �
   await expect(page.getByTestId("topic-complete")).toHaveCount(0);
   await acknowledgeFeedback(page);
 
-  const firstPart = page.getByTestId(`solid-part-${FACE_IDS[0]}`);
-  await advanceUntil(page, page.getByTestId("solid-example-solid-cuboid"));
-  await page.getByTestId("solid-example-solid-cuboid").click();
-  await expect(firstPart).toBeVisible();
+  const player = page.locator('[data-topic="SOLID"]');
+  await expect(player).toHaveAttribute("data-step", "solid-parts");
+  await expect(page.getByTestId("solid-example-solid-cuboid")).toBeVisible();
+  await expect(page.getByTestId(`solid-part-${FACE_IDS[0]}`)).toBeVisible();
   expect(await stablePartIds(page)).toEqual(ALL_IDS);
+  await expect(page.getByTestId("solid-submit")).toHaveCount(0);
 
   const viewport = page.getByTestId("viewport").first();
   const canvas = viewport.locator("canvas");
@@ -144,10 +145,13 @@ test("분류 확인 후 구성 요소를 회전 전후 같은 ID로 세고 두 �
 
   expect(await stablePartIds(page)).toEqual(ALL_IDS);
 
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(player).toHaveAttribute("data-step", "solid-count");
+  await expect(page.getByTestId("solid-submit")).toBeVisible();
+  expect(await stablePartIds(page)).toEqual(ALL_IDS);
+
   for (const id of ALL_IDS) {
-    await page
-      .getByTestId(`solid-part-${id}`)
-      .evaluate((node) => (node as HTMLElement).click());
+    await page.getByTestId(`solid-part-${id}`).click();
   }
   await expect(page.getByTestId("solid-selected-count")).toHaveText(
     "선택 26개",
