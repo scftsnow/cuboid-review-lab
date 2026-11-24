@@ -1,6 +1,5 @@
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent, ReactElement } from "react";
-import { foldNetLayout, type FoldResult } from "../geometry/netFold";
 import type { NetFace, NetLayout } from "../geometry/netLayout";
 // prettier-ignore
 import { expectedFaceInventory, rotateNetFace, translateNetFace } from "../geometry/netLayout";
@@ -11,20 +10,24 @@ type Mode='predict'|'repair'|'partial'|'blank';
 type Rect = { x: number; y: number; w: number; h: number };
 type Point = [number, number];
 // prettier-ignore
-type Segment={axis:'h'|'v';line:number;start:number;end:number};
-// prettier-ignore
-type PartMaps={groups:Map<string,string>;localGroup:Map<string,string>;localFace:Map<string,string>};
-// prettier-ignore
 type Props={kind:'cube'|'cuboid';mode?:Mode|null;sideLengths:readonly [number,number,number];
-  layout?:NetLayout|null;selectedPartId?:string|null;fixedFaceIds?:readonly string[];
-  onChange?:(layout:NetLayout)=>void;onSelect?:(partId:string)=>void;
-  onNotice?:(code:Notice)=>void};
+  layout?:NetLayout|null;selectedPartId?:string|null;highlightedPartIds?:readonly string[]|null;
+  fixedFaceIds?:readonly string[];onChange?:(layout:NetLayout)=>void;
+  onSelect?:(partId:string)=>void;onNotice?:(code:Notice)=>void};
 // prettier-ignore
-const MODES:readonly Mode[]=['predict','repair','partial','blank'],EDGES=[0,1,2,3] as const,EMPTY_CORRESPONDENCE:FoldResult['correspondence']={faces:[],edges:[],vertices:[]};
+const MODES:readonly Mode[]=['predict','repair','partial','blank'],EDGES=[0,1,2,3] as const;
 // prettier-ignore
 function rectOf(face:NetFace):Rect {const swap=face.quarterTurns%2===1;return {x:face.origin.x,y:face.origin.y,w:swap?face.size.height:face.size.width,h:swap?face.size.width:face.size.height}}
 // prettier-ignore
 function sizeKey(width:number,height:number):string {return width<=height?width+'x'+height:height+'x'+width}
+// prettier-ignore
+function canonicalPartId(value:string):string {
+  const edge=/^([^:]+):e([0-3])$/.exec(value); if(edge)return edge[1]+':edge:'+edge[2];
+  const vertex=/^([^:]+):v([0-3])$/.exec(value); if(vertex)return vertex[1]+':vertex:'+vertex[2];
+  return value;
+}
+// prettier-ignore
+function faceIdOf(partId:string):string {return partId.split(':')[0]??''}
 // prettier-ignore
 function edgeBand(rect:Rect,index:number):Rect {
   return index===0?{x:rect.x,y:rect.y-0.12,w:rect.w,h:0.24}:index===1?{x:rect.x+rect.w-0.12,y:rect.y,w:0.24,h:rect.h}:index===2?{x:rect.x,y:rect.y+rect.h-0.12,w:rect.w,h:0.24}:{x:rect.x-0.12,y:rect.y,w:0.24,h:rect.h};
@@ -32,87 +35,22 @@ function edgeBand(rect:Rect,index:number):Rect {
 // prettier-ignore
 function vertices(rect:Rect):readonly Point[] {return [[rect.x,rect.y],[rect.x+rect.w,rect.y],[rect.x+rect.w,rect.y+rect.h],[rect.x,rect.y+rect.h]]}
 // prettier-ignore
-function segments(rect:Rect):readonly Segment[] {
-  return [{axis:'h',line:rect.y,start:rect.x,end:rect.x+rect.w},
-    {axis:'v',line:rect.x+rect.w,start:rect.y,end:rect.y+rect.h},
-    {axis:'h',line:rect.y+rect.h,start:rect.x,end:rect.x+rect.w},
-    {axis:'v',line:rect.x,start:rect.y,end:rect.y+rect.h}];
-}
-// prettier-ignore
 function boundsOf(rects:readonly Rect[]) {
   return rects.reduce((b,r)=>({minX:Math.min(b.minX,r.x-1),minY:Math.min(b.minY,r.y-1),maxX:Math.max(b.maxX,r.x+r.w+1),maxY:Math.max(b.maxY,r.y+r.h+1)}),{minX:0,minY:0,maxX:8,maxY:8});
 }
 // prettier-ignore
-function partMapsOf(faces:readonly NetFace[],corr:FoldResult['correspondence']):PartMaps {
-  const groups=new Map<string,string>();
-  const localGroup=new Map<string,string>();
-  const localFace=new Map<string,string>();
-  const segmentOf=new Map<string,string>();
-  const pointOf=new Map<string,string>();
-  const edgeOwners=new Map<string,Set<string>>();
-  const vertexOwners=new Map<string,Set<string>>();
+function knownPartIdsOf(faces:readonly NetFace[]):ReadonlySet<string> {
+  const ids=new Set<string>();
   faces.forEach(face=>{
-    segments(rectOf(face)).forEach((s,i)=>{
-      const local=face.id+':edge:'+i;
-      const key=[s.axis,s.line,Math.min(s.start,s.end),Math.max(s.start,s.end)].join(':');
-      segmentOf.set(local,key);
-      const ids=edgeOwners.get(key)??new Set<string>(); ids.add(face.id); edgeOwners.set(key,ids);
-    });
-    vertices(rectOf(face)).forEach((point,i)=>{
-      const local=face.id+':vertex:'+i;
-      const key=point.join(',');
-      pointOf.set(local,key);
-      const ids=vertexOwners.get(key)??new Set<string>(); ids.add(face.id); vertexOwners.set(key,ids);
-    });
+    ids.add(face.id);
+    EDGES.forEach(index=>ids.add(face.id+':edge:'+index));
+    vertices(rectOf(face)).forEach((_point,index)=>ids.add(face.id+':vertex:'+index));
   });
-  const edgeAlias=new Map<string,string>();
-  segmentOf.forEach((key,local)=>{
-    const ids=[...(edgeOwners.get(key)??[])].sort();
-    if(ids.length>1)edgeAlias.set(local,'E:'+ids.join(':'));
-  });
-  const vertexAlias=new Map<string,string>();
-  pointOf.forEach((key,local)=>{
-    const ids=[...(vertexOwners.get(key)??[])].sort();
-    if(ids.length>1)vertexAlias.set(local,'V:'+ids.join(':'));
-  });
-  const foldFace=new Map(corr.faces.map(item=>[item.faceId,item.foldedFaceId]));
-  const foldEdge=new Map<string,string>();
-  corr.edges.forEach(item=>item.positions2d.forEach(part=>
-    foldEdge.set(part.faceId+':edge:'+part.edgeIndex,item.foldedEdgeId)));
-  const foldVertex=new Map<string,string>();
-  corr.vertices.forEach(item=>item.positions2d.forEach(part=>
-    foldVertex.set(part.faceId+':vertex:'+part.vertexIndex,item.foldedVertexId)));
-  const put=(id:string,group:string,faceId:string)=>{
-    if(id&&!groups.has(id)){groups.set(id,group);localFace.set(id,faceId)}
-  };
-  faces.forEach(face=>{
-    put(face.id,face.id,face.id);
-    const foldedFaceId=foldFace.get(face.id);
-    if(foldedFaceId)put(foldedFaceId,face.id,face.id);
-    EDGES.forEach(index=>{
-      const local=face.id+':edge:'+index;
-      const fallback=face.id+':e'+index;
-      const group=foldEdge.get(local)??edgeAlias.get(local)??fallback;
-      localGroup.set(local,group);
-      put(local,group,face.id); put(fallback,group,face.id); put(group,group,face.id);
-      const alias=edgeAlias.get(local);
-      if(alias)put(alias,group,face.id);
-    });
-    vertices(rectOf(face)).forEach((_point,index)=>{
-      const local=face.id+':vertex:'+index;
-      const fallback=face.id+':v'+index;
-      const group=foldVertex.get(local)??vertexAlias.get(local)??fallback;
-      localGroup.set(local,group);
-      put(local,group,face.id); put(fallback,group,face.id); put(group,group,face.id);
-      const alias=vertexAlias.get(local);
-      if(alias)put(alias,group,face.id);
-    });
-  });
-  return {groups,localGroup,localFace};
+  return ids;
 }
 // prettier-ignore
 export function NetBoard(props:Props):ReactElement|null {
-  const {kind,mode,sideLengths,layout,selectedPartId,fixedFaceIds,onChange,onSelect,onNotice}=props;
+  const {kind,mode,sideLengths,layout,selectedPartId,highlightedPartIds,fixedFaceIds,onChange,onSelect,onNotice}=props;
   const validKind=kind==='cube'||kind==='cuboid';
   const validSides=Array.isArray(sideLengths)&&sideLengths.length===3&&
     sideLengths.every(v=>Number.isFinite(v)&&v>0)&&
@@ -121,16 +59,16 @@ export function NetBoard(props:Props):ReactElement|null {
   const boardLayout=useMemo<NetLayout>(()=>layout&&Array.isArray(layout.faces)?layout:
     {kind:validKind?kind:'cube',sideLengths:validSides?sideLengths:[1,1,1],faces:[]},
     [layout,kind,sideLengths,validKind,validSides]);
-  const fold=useMemo(()=>validKind&&validSides?foldNetLayout(boardLayout):null,
-    [boardLayout,validKind,validSides]);
-  const parts=useMemo(()=>partMapsOf(boardLayout.faces,fold?fold.correspondence:EMPTY_CORRESPONDENCE),
-    [boardLayout.faces,fold]);
-  const selected=typeof selectedPartId==='string'?selectedPartId.trim():'';
-  const selectedGroup=selected?parts.groups.get(selected)??null:null;
-  const activeId=selected?parts.localFace.get(selected)??null:null;
   const faces=boardLayout.faces;
-  const active=faces.find(face=>face.id===activeId);
-  const locked=activeId!==null&&(fixedFaceIds??[]).includes(activeId);
+  const selected=typeof selectedPartId==='string'?canonicalPartId(selectedPartId.trim()):'';
+  const highlights=useMemo(()=>{
+    const source=Array.isArray(highlightedPartIds)?highlightedPartIds:selected?[selected]:[];
+    return new Set(source.map(id=>typeof id==='string'?canonicalPartId(id.trim()):'').filter(Boolean));
+  },[highlightedPartIds,selected]);
+  const knownIds=useMemo(()=>knownPartIdsOf(faces),[faces]);
+  const activeId=selected?faceIdOf(selected):'';
+  const active=faces.find(face=>face.id===activeId)??null;
+  const locked=active!==null&&(fixedFaceIds??[]).includes(active.id);
   const [paletteIndex,setPaletteIndex]=useState<number|null>(null);
   const lastNotice=useRef('');
   const palette=useMemo(()=>validKind&&validSides?expectedFaceInventory(kind,sideLengths).flatMap((item,groupIndex)=>
@@ -148,16 +86,16 @@ export function NetBoard(props:Props):ReactElement|null {
       }
       return;
     }
-    if(selected&&selectedGroup===null){
+    if(selected&&!knownIds.has(selected)&&![...highlights].some(id=>knownIds.has(id))){
       const marker='UNKNOWN:'+selected;
       if(lastNotice.current!==marker){lastNotice.current=marker;onNotice?.('UNKNOWN_PART_ID')}
       return;
     }
     lastNotice.current='';
-  },[validKind,validSides,selected,selectedGroup,onNotice]);
+  },[validKind,validSides,selected,highlights,knownIds,onNotice]);
   if(!validKind||!validSides)return null;
   const rects=faces.map(rectOf),bounds=boundsOf(rects),notify=(code:Notice)=>onNotice?.(code);
-  const highlight=(group:string)=>selectedGroup!==null&&group===selectedGroup?{'data-highlighted-2d':''}:{};
+  const highlight=(partId:string)=>highlights.has(partId)?{'data-highlighted-2d':''}:{};
   const choose=(partId:string,event:MouseEvent)=>{event.stopPropagation();onSelect?.(partId)};
   const place=(x:number,y:number,event:MouseEvent)=>{
     event.stopPropagation();
@@ -221,17 +159,14 @@ export function NetBoard(props:Props):ReactElement|null {
             <rect className="net-face-shape" x={rect.x} y={rect.y} width={rect.w} height={rect.h} />
             <text className="net-face-label" x={rect.x+0.2} y={rect.y+0.5} pointerEvents="none">{face.id}</text>
             {EDGES.map(index=>{
-              const localKey=face.id+':edge:'+index;
-              const group=parts.localGroup.get(localKey)??face.id+':e'+index;
-              const band=edgeBand(rect,index);
-              return <rect key={localKey} className="net-edge-hit" data-part-id={group} {...highlight(group)}
-                x={band.x} y={band.y} width={band.w} height={band.h} onClick={event=>choose(group,event)} />;
+              const partId=face.id+':edge:'+index,band=edgeBand(rect,index);
+              return <rect key={partId} className="net-edge-hit" data-part-id={partId} {...highlight(partId)}
+                x={band.x} y={band.y} width={band.w} height={band.h} onClick={event=>choose(partId,event)} />;
             })}
             {vertices(rect).map((point,index)=>{
-              const localKey=face.id+':vertex:'+index;
-              const group=parts.localGroup.get(localKey)??face.id+':v'+index;
-              return <circle key={localKey} className="net-vertex-hit" data-part-id={group} {...highlight(group)}
-                cx={point[0]} cy={point[1]} r={0.18} onClick={event=>choose(group,event)} />;
+              const partId=face.id+':vertex:'+index;
+              return <circle key={partId} className="net-vertex-hit" data-part-id={partId} {...highlight(partId)}
+                cx={point[0]} cy={point[1]} r={0.18} onClick={event=>choose(partId,event)} />;
             })}
           </g>;
         })}
@@ -239,7 +174,7 @@ export function NetBoard(props:Props):ReactElement|null {
       <div className="net-board-actions" role="group" aria-label="전개도 조작">
         <button type="button" data-board-action="rotate" disabled={!active} onClick={rotate}>회전</button>
         <button type="button" data-board-action="remove" disabled={!active} onClick={remove}>제거</button>
-        <button type="button" data-board-action="clear-selection" disabled={!active} onClick={()=>onSelect?.('')}>선택 해제</button>
+        <button type="button" data-board-action="clear-selection" disabled={!selected&&highlights.size===0} onClick={()=>onSelect?.('')}>선택 해제</button>
       </div>
     </section>
   );
