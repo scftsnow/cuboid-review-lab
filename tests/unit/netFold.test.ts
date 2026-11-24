@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { foldNetLayout } from "../../src/geometry/netFold";
 import type { NetFace, NetLayout } from "../../src/geometry/netLayout";
 
-function face(id: string, x: number, y: number, width = 1, height = 1): NetFace {
+function face(
+  id: string,
+  x: number,
+  y: number,
+  width = 1,
+  height = 1,
+): NetFace {
   return { id, origin: { x, y }, size: { width, height }, quarterTurns: 0 };
 }
 
@@ -85,7 +91,9 @@ function signature(layout: NetLayout) {
   return {
     planes: result.faces.map((item) => item.plane).sort(),
     edges: result.correspondence.edges.map((item) => item.foldedEdgeId).sort(),
-    vertices: result.correspondence.vertices.map((item) => item.foldedVertexId).sort(),
+    vertices: result.correspondence.vertices
+      .map((item) => item.foldedVertexId)
+      .sort(),
   };
 }
 
@@ -119,7 +127,13 @@ function expectClosedBox(layout: NetLayout): void {
     }
   }
   for (const entry of result.correspondence.faces) {
-    expect(result.faces.some((item) => item.faceId === entry.faceId && item.foldedFaceId === entry.foldedFaceId)).toBe(true);
+    expect(
+      result.faces.some(
+        (item) =>
+          item.faceId === entry.faceId &&
+          item.foldedFaceId === entry.foldedFaceId,
+      ),
+    ).toBe(true);
   }
 }
 
@@ -127,7 +141,9 @@ describe("foldNetLayout", () => {
   it("folds two cube crosses with shared folded face, edge and vertex IDs", () => {
     expectClosedBox(cubeCross);
     expectClosedBox(translate(cubeCross, 11, 7));
-    expect(signature(cubeCross)).toEqual(signature(translate(cubeCross, 11, 7)));
+    expect(signature(cubeCross)).toEqual(
+      signature(translate(cubeCross, 11, 7)),
+    );
   });
 
   it("folds two valid cuboid nets and their translated copy into the same correspondence set", () => {
@@ -135,13 +151,17 @@ describe("foldNetLayout", () => {
     expectClosedBox(cuboidBottomBack);
     expectClosedBox(translate(cuboidTopBack, 10, 6));
     expect(signature(cuboidTopBack)).toEqual(signature(cuboidBottomBack));
-    expect(signature(translate(cuboidTopBack, 10, 6))).toEqual(signature(cuboidTopBack));
+    expect(signature(translate(cuboidTopBack, 10, 6))).toEqual(
+      signature(cuboidTopBack),
+    );
   });
 
   it("reports a 3D face overlap with its 2D repair location", () => {
     const result = foldNetLayout(overlapRect);
     expect(result.ok).toBe(false);
-    const reason = result.reasons.find((item) => item.code === "FACE_OVERLAP_3D");
+    const reason = result.reasons.find(
+      (item) => item.code === "FACE_OVERLAP_3D",
+    );
     expect(reason).toBeDefined();
     expect(reason?.faceIds).toEqual(expect.arrayContaining(["d", "e"]));
     expect(reason?.location).toEqual({ x: 1, y: 1 });
@@ -150,7 +170,9 @@ describe("foldNetLayout", () => {
   it("reports a disconnected face with its 2D repair location", () => {
     const result = foldNetLayout(disconnected);
     expect(result.ok).toBe(false);
-    const reason = result.reasons.find((item) => item.code === "DISCONNECTED_FACE");
+    const reason = result.reasons.find(
+      (item) => item.code === "DISCONNECTED_FACE",
+    );
     expect(reason).toBeDefined();
     expect(reason?.faceIds).toEqual(["b"]);
     expect(reason?.location).toEqual({ x: 5, y: 5 });
@@ -159,7 +181,9 @@ describe("foldNetLayout", () => {
   it("reports a partial edge contact with its 2D repair location", () => {
     const result = foldNetLayout(partialContact);
     expect(result.ok).toBe(false);
-    const reason = result.reasons.find((item) => item.code === "EDGE_LENGTH_MISMATCH");
+    const reason = result.reasons.find(
+      (item) => item.code === "EDGE_LENGTH_MISMATCH",
+    );
     expect(reason).toBeDefined();
     expect(reason?.faceIds).toEqual(expect.arrayContaining(["long", "short"]));
     expect(reason?.location).toEqual({ x: 1, y: 0.5 });
@@ -168,22 +192,48 @@ describe("foldNetLayout", () => {
   it("exposes all 2D positions for folded selections and returns EMPTY_LAYOUT for a blank board", () => {
     const folded = foldNetLayout(cubeCross);
     const faceEntry = folded.correspondence.faces[0];
-    const foldedFace = folded.faces.find((item) => item.faceId === faceEntry.faceId);
+    const foldedFace = folded.faces.find(
+      (item) => item.faceId === faceEntry.faceId,
+    );
     expect(foldedFace?.foldedFaceId).toBe(faceEntry.foldedFaceId);
-    expect(folded.correspondence.faces.filter((item) => item.foldedFaceId === faceEntry.foldedFaceId)).toHaveLength(1);
+    expect(
+      folded.correspondence.faces.filter(
+        (item) => item.foldedFaceId === faceEntry.foldedFaceId,
+      ),
+    ).toHaveLength(1);
 
     const edge = folded.correspondence.edges[0];
-    expect(folded.correspondence.edges.filter((item) => item.foldedEdgeId === edge.foldedEdgeId)).toHaveLength(1);
-    expect(edge.positions2d.map((item) => item.faceId).sort()).toEqual([...edge.faceIds].sort());
+    expect(
+      folded.correspondence.edges.filter(
+        (item) => item.foldedEdgeId === edge.foldedEdgeId,
+      ),
+    ).toHaveLength(1);
+    expect(edge.positions2d.map((item) => item.faceId).sort()).toEqual(
+      [...edge.faceIds].sort(),
+    );
 
     const vertex = folded.correspondence.vertices[0];
-    expect(folded.correspondence.vertices.filter((item) => item.foldedVertexId === vertex.foldedVertexId)).toHaveLength(1);
-    expect(vertex.positions2d.map((item) => item.faceId).sort()).toEqual([...vertex.faceIds].sort());
+    expect(
+      folded.correspondence.vertices.filter(
+        (item) => item.foldedVertexId === vertex.foldedVertexId,
+      ),
+    ).toHaveLength(1);
+    expect(vertex.positions2d.map((item) => item.faceId).sort()).toEqual(
+      [...vertex.faceIds].sort(),
+    );
 
-    const empty = foldNetLayout({ kind: "cube", sideLengths: [1, 1, 1], faces: [] });
+    const empty = foldNetLayout({
+      kind: "cube",
+      sideLengths: [1, 1, 1],
+      faces: [],
+    });
     expect(empty.ok).toBe(false);
     expect(empty.reasons.map((item) => item.code)).toContain("EMPTY_LAYOUT");
     expect(empty.faces).toEqual([]);
-    expect(empty.correspondence).toEqual({ faces: [], edges: [], vertices: [] });
+    expect(empty.correspondence).toEqual({
+      faces: [],
+      edges: [],
+      vertices: [],
+    });
   });
 });
