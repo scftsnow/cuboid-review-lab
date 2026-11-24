@@ -5,14 +5,6 @@ const IDS = ["fBack", "fFront", "fBottom", "fTop", "fLeft", "fRight"] as const;
 type FaceId = (typeof IDS)[number];
 type Category = "opposite" | "side" | "parallel" | "perpendicular";
 
-const LABELS: Record<FaceId, string> = {
-  fBack: "뒷면",
-  fFront: "앞면",
-  fBottom: "아랫면",
-  fTop: "윗면",
-  fLeft: "왼쪽 면",
-  fRight: "오른쪽 면",
-};
 const CATEGORY_LABELS: Record<Category, string> = {
   opposite: "다른 밑면",
   side: "옆면",
