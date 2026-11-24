@@ -1,18 +1,33 @@
 import { useMemo, useState, type ReactElement } from "react";
 import * as THREE from "three";
+// prettier-ignore
 import { getSolidTopology, listSolidExamples, type SolidExample } from "../geometry/solid";
-import { buildSolidScene as buildBoxScene } from "../scene/solidScene";
-import { Viewport } from "../scene/Viewport";
+import { buildSolidScene } from "../scene/solidScene";
+// prettier-ignore
+import { SolidLessonView, type SolidLessonParts, type SolidLessonStep } from "./SolidLessonView";
 import { TOPICS } from "./topics";
+
 export type { SolidExample };
 
+// prettier-ignore
 type Reason = "SOLID_MODEL_MISSING" | "INVALID_SELECTION" | "DUPLICATE_SELECTION_IGNORED" | "QUIZ_ID_MISMATCH" | "CALLBACK_MISSING";
+
 type Counts = { faces?: number; edges?: number; vertices?: number };
+
+// prettier-ignore
 type Result = { quizId: string; correct: boolean; expected: string; selectedIds: readonly string[]; counts?: Counts; deduplicatedIds?: number; reasonCode: Reason | null; contractQuizId?: string; reason?: string; hint?: string };
+
 type Submission = Omit<Result, "quizId" | "contractQuizId">;
+
+// prettier-ignore
 type TopicSpec = { id?: string; topicId?: string; stepIds?: readonly string[]; steps?: readonly string[]; requiredQuizIds?: readonly string[]; quizzes?: readonly { id?: string; stepId?: string }[] };
+
+// prettier-ignore
 type Callbacks = { onStepChange?: (id: string) => void; onSubmit?: (result: Result) => void; onAcknowledge?: (id: string) => void; onReturnToMap?: () => void };
+
+// prettier-ignore
 type Props = { topicId?: string; stepId?: string; quizId?: string; examples?: readonly SolidExample[]; topics?: TopicSpec; callbacks?: Callbacks; onStepChange?: (id: string) => void; onSubmit?: (result: Result) => void; onAcknowledge?: (id: string) => void; onReturnToMap?: () => void };
+
 export type SolidLessonResult = Result;
 export type SolidLessonCallbacks = Callbacks;
 export type SolidLessonProps = Props;
@@ -20,33 +35,40 @@ export type SolidLessonProps = Props;
 const STEPS = ["definition", "classify", "parts", "count", "result"] as const;
 const QUIZ = ["solid-classify", "solid-parts", "solid-count"] as const;
 const KINDS = ["face", "edge", "vertex"] as const;
-const LABEL: Record<string, string> = { definition: "정의와 관찰", classify: "새 도형 분류", parts: "구성 요소 찾기", count: "직접 세기", result: "결과 확인" };
 
-function stepOf(id?: string): string {
-  if (!id) return "";
-  const value = id.toLowerCase();
-  if (value.includes("intro") || value.includes("definition")) return "definition";
+function lessonStep(id?: string): SolidLessonStep {
+  const value = (id ?? "").toLowerCase();
   if (value.includes("classify")) return "classify";
   if (value.includes("parts")) return "parts";
-  if (value.includes("count")) return "count";
-  return value.includes("result") ? "result" : "";
+  if (value.includes("count") || value.includes("result")) return "count";
+  return "definition";
 }
 
 function checkTopic(spec?: TopicSpec): boolean {
   const topic = spec ?? (TOPICS.SOLID as TopicSpec);
   const id = topic.topicId ?? topic.id ?? "";
   const steps = topic.stepIds ?? topic.steps ?? STEPS;
-  const quizzes = [...(topic.quizzes ?? []).map((quiz) => quiz.id ?? quiz.stepId ?? ""), ...(topic.requiredQuizIds ?? [])];
+  const quizzes = [
+    ...(topic.quizzes ?? []).map((quiz) => quiz.id ?? quiz.stepId ?? ""),
+    ...(topic.requiredQuizIds ?? []),
+  ];
   const canonical = QUIZ.every((quizId) => quizzes.includes(quizId));
-  const shared = ["classify", "parts", "count"].every((name) => steps.some((stepId) => stepId.includes("solid-" + name))) && ["classify", "count"].every((name) => quizzes.some((quizId) => quizId.includes("solid-" + name)));
+  const shared =
+    ["classify", "parts", "count"].every((name) =>
+      steps.some((stepId) => stepId.includes("solid-" + name)),
+    ) &&
+    ["classify", "count"].every((name) =>
+      quizzes.some((quizId) => quizId.includes("solid-" + name)),
+    );
   return (id === "solid" || id === "SOLID") && (canonical || shared);
 }
 
-function topologyParts(example: SolidExample | null) {
-  const empty = { face: [] as string[], edge: [] as string[], vertex: [] as string[] };
+function topologyParts(example: SolidExample | null): SolidLessonParts {
+  const empty: SolidLessonParts = { face: [], edge: [], vertex: [] };
   if (!example) return empty;
   const topology = getSolidTopology(example.id);
   if (!topology.ok) return empty;
+  // prettier-ignore
   return { face: topology.value.faces.map((part) => part.id), edge: topology.value.edges.map((part) => part.id), vertex: topology.value.vertices.map((part) => part.id) };
 }
 
@@ -58,168 +80,167 @@ function compact(counts: { faces: number; edges: number; vertices: number }) {
   return result;
 }
 
-function gradeSelection(example: SolidExample | null, selected: readonly string[]): Submission {
+function gradeSelection(
+  example: SolidExample | null,
+  selected: readonly string[],
+): Submission {
   const expected = "면 6개, 모서리 12개, 꼭짓점 8개";
-  if (!example || selected.length === 0) return { correct: false, expected, selectedIds: [], reasonCode: "SOLID_MODEL_MISSING" };
+  if (!example || selected.length === 0) {
+    return {
+      correct: false,
+      expected,
+      selectedIds: [],
+      reasonCode: "SOLID_MODEL_MISSING",
+    };
+  }
   const parts = topologyParts(example);
   const known = new Map<string, string>();
-  for (const kind of KINDS) for (const id of parts[kind]) known.set(id, kind);
+  for (const kind of KINDS) {
+    for (const id of parts[kind]) known.set(id, kind);
+  }
   const unique = new Set<string>();
   let duplicates = 0;
   let invalid = 0;
   const counts = { faces: 0, edges: 0, vertices: 0 };
   for (const id of selected) {
-    if (!known.has(id)) invalid += 1;
-    else if (unique.has(id)) duplicates += 1;
-    else {
+    if (!known.has(id)) {
+      invalid += 1;
+    } else if (unique.has(id)) {
+      duplicates += 1;
+    } else {
       unique.add(id);
       if (known.get(id) === "face") counts.faces += 1;
       if (known.get(id) === "edge") counts.edges += 1;
       if (known.get(id) === "vertex") counts.vertices += 1;
     }
   }
+  // prettier-ignore
   const reasonCode = duplicates > 0 ? "DUPLICATE_SELECTION_IGNORED" : invalid > 0 || unique.size !== selected.length ? "INVALID_SELECTION" : null;
-  const full = { faces: parts.face.length, edges: parts.edge.length, vertices: parts.vertex.length };
+  const full = {
+    faces: parts.face.length,
+    edges: parts.edge.length,
+    vertices: parts.vertex.length,
+  };
+  // prettier-ignore
   return { correct: reasonCode === null && counts.faces === 6 && counts.edges === 12 && counts.vertices === 8, expected, selectedIds: [...unique], counts: compact(duplicates > 0 ? counts : full), deduplicatedIds: duplicates > 0 ? unique.size : undefined, reasonCode };
 }
 
 function createLessonScene(example: SolidExample | null) {
   const topology = example ? getSolidTopology(example.id) : null;
-  if (topology?.ok) return buildBoxScene(topology.value);
+  if (topology?.ok) return buildSolidScene(topology.value);
   const scene = new THREE.Scene();
-  const geometry = example?.kind === "cone" ? new THREE.ConeGeometry(0.85, 1.7, 24) : new THREE.CylinderGeometry(0.8, 0.8, 1.7, 3);
-  if (example) scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x9cc6ff, wireframe: true })));
+  const geometry =
+    example?.kind === "cone"
+      ? new THREE.ConeGeometry(0.85, 1.7, 24)
+      : new THREE.CylinderGeometry(0.8, 0.8, 1.7, 3);
+  if (example) {
+    // prettier-ignore
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x9cc6ff, wireframe: true })));
+  }
   return { scene, pickables: [] as THREE.Object3D[] };
 }
 
 export function SolidLesson(props: Props): ReactElement {
-  const [exampleId, setExampleId] = useState<string | null>(() => props.examples?.find((item) => item.kind === "cuboid")?.id ?? "solid-cuboid");
+  const examples = props.examples ?? listSolidExamples();
+  const [exampleId, setExampleId] = useState<string | null>(
+    () =>
+      props.examples?.find((item) => item.kind === "cuboid")?.id ??
+      "solid-cuboid",
+  );
   const [answer, setAnswer] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState<Result | null>(null);
-  const [internalStep, setInternalStep] = useState("definition");
-  const callbacks: Callbacks = props.callbacks ?? {};
+  const [guidance, setGuidance] = useState("");
+  const callbacks = props.callbacks ?? {};
   const submit = callbacks.onSubmit ?? props.onSubmit;
-  const returnToMap = callbacks.onReturnToMap ?? props.onReturnToMap;
-  const examples = props.examples ?? listSolidExamples();
-  const step = stepOf(props.stepId) || internalStep;
+  const step = lessonStep(props.stepId);
   const example = examples.find((item) => item.id === exampleId) ?? null;
   const parts = topologyParts(example);
-  const { scene, pickables } = useMemo(() => createLessonScene(example), [example]);
-  const interactiveIds = new Set([...parts.face, ...parts.edge, ...parts.vertex]);
-  const expected = example?.label ?? example?.nameKo ?? "";
+  const lessonScene = useMemo(() => createLessonScene(example), [example]);
+  const interactiveIds = new Set([
+    ...parts.face,
+    ...parts.edge,
+    ...parts.vertex,
+  ]);
+  const expected = example?.nameKo ?? example?.label ?? "";
   const invalidTopic = !checkTopic(props.topics);
 
-  function emit(quiz: string, value: Submission) {
-    const result: Result = { ...value, quizId: props.quizId ?? quiz, contractQuizId: quiz, reason: value.reasonCode ?? undefined, hint: value.correct ? undefined : "예제 이름과 구성 요소 수를 다시 확인해 보세요." };
-    setFeedback(result);
+  function emit(quizId: string, value: Submission) {
+    const result: Result = {
+      ...value,
+      quizId: props.quizId ?? quizId,
+      contractQuizId: quizId,
+      reason: value.reasonCode ?? undefined,
+      hint: value.correct
+        ? undefined
+        : "예제 이름과 구성 요소 수를 다시 확인해 보세요.",
+    };
     submit?.(result);
-    callbacks.onStepChange?.(props.stepId ?? quiz);
   }
 
   function classify() {
     if (!example || answer.trim() === "") {
-      emit(QUIZ[0], { correct: false, expected, selectedIds: [], reasonCode: "SOLID_MODEL_MISSING" });
+      setGuidance("분류할 도형의 이름을 먼저 선택해 주세요.");
       return;
     }
+    setGuidance("");
     const correct = answer.trim() === expected;
-    emit(QUIZ[0], { correct, expected, selectedIds: [], reasonCode: correct ? null : "INVALID_SELECTION" });
+    emit(QUIZ[0], {
+      correct,
+      expected,
+      selectedIds: [],
+      reasonCode: correct ? null : "INVALID_SELECTION",
+    });
   }
 
-  function togglePart(id: string) {
-    if (selectedIds.includes(id)) emit(props.quizId ?? QUIZ[2], gradeSelection(example, selectedIds));
-    else setSelectedIds([...selectedIds, id]);
+  function countParts() {
+    setGuidance("");
+    const quizId = step === "parts" ? QUIZ[1] : QUIZ[2];
+    emit(quizId, gradeSelection(example, selectedIds));
   }
 
-  function handlePick(id: string | null) {
-    if (id && interactiveIds.has(id) && (step === "parts" || step === "count")) togglePart(id);
+  function selectPart(id: string | null) {
+    if (!id || !interactiveIds.has(id)) return;
+    if (selectedIds.includes(id)) {
+      emit(props.quizId ?? QUIZ[2], gradeSelection(example, selectedIds));
+      return;
+    }
+    setSelectedIds([...selectedIds, id]);
+  }
+
+  function selectExample(id: string) {
+    setExampleId(id);
+    setSelectedIds([]);
+    setAnswer("");
+    setGuidance("");
   }
 
   if (invalidTopic || typeof submit !== "function") {
     return (
       <section data-testid="solid-lesson" role="alert">
         <h2>직육면체와 정육면체</h2>
-        <p>{invalidTopic ? "QUIZ_ID_MISMATCH" : "CALLBACK_MISSING"}: 활동 연결을 확인해 주세요.</p>
+        <p>
+          {invalidTopic ? "QUIZ_ID_MISMATCH" : "CALLBACK_MISSING"}: 활동 연결을
+          확인해 주세요.
+        </p>
       </section>
     );
   }
 
   return (
-    <section data-testid="solid-lesson" aria-label="직육면체 복습">
-      <h2>직육면체와 정육면체</h2>
-      {!props.stepId && <nav aria-label="학습 단계">{STEPS.map((id) => <button key={id} type="button" data-testid={"solid-step-" + id} aria-current={step === id ? "step" : undefined} onClick={() => { setInternalStep(id); setFeedback(null); callbacks.onStepChange?.(id); }}>{LABEL[id]}</button>)}</nav>}
-      {step === "definition" ? (
-        <div data-testid="solid-step-content">
-          <p>직육면체는 여섯 개의 직사각형 면으로, 정육면체는 같은 크기의 정사각형 여섯 개로 둘러싸인 입체입니다. 돌려 보아도 면 6개, 모서리 12개, 꼭짓점 8개는 같습니다.</p>
-          <p data-testid="solid-parts-explanation">면은 도형의 넓은 겉면, 모서리는 두 면이 만나는 선, 꼭짓점은 세 모서리가 만나는 점입니다.</p>
-          <div role="group" aria-label="관찰할 도형">
-            {examples.filter((item) => item.kind === "cube" || item.kind === "cuboid").map((item) => (
-              <button key={item.id} type="button" data-testid={"solid-observe-" + item.id} aria-pressed={item.id === exampleId} onClick={() => { setExampleId(item.id); setSelectedIds([]); setFeedback(null); }}>
-                {item.nameKo ?? item.label ?? item.id}
-              </button>
-            ))}
-          </div>
-          <div data-testid="solid-viewport" style={{ height: 240 }}>
-            <Viewport sceneId={"solid-" + (example?.id ?? "none")} scene={scene} camera={{ position: [3, 2.4, 3], target: [0, 0, 0], fov: 45 }} pickables={[]} onPick={handlePick} ariaLabelKo="도형을 돌려 보고 면, 모서리, 꼭짓점을 미리 볼 수 있습니다" />
-          </div>
-          {!props.stepId && <button type="button" onClick={() => { setInternalStep("classify"); callbacks.onStepChange?.("classify"); }}>분류 활동으로 이동</button>}
-        </div>
-      ) : (
-        <div data-testid="solid-step-content">
-          <div role="group" aria-label="예제 도형">
-            {examples.map((item) => (
-              <button key={item.id} type="button" data-testid={"solid-example-" + item.id} aria-pressed={item.id === exampleId} onClick={() => { setExampleId(item.id); setSelectedIds([]); setFeedback(null); }}>
-                {item.nameKo ?? item.label ?? item.id}
-              </button>
-            ))}
-          </div>
-          <div data-testid="solid-viewport" style={{ height: 240 }}>
-            <Viewport sceneId={"solid-" + (example?.id ?? "none")} scene={scene} camera={{ position: [3, 2.4, 3], target: [0, 0, 0], fov: 45 }} pickables={step === "parts" || step === "count" ? pickables : []} onPick={handlePick} ariaLabelKo="도형을 돌려 보고 면, 모서리, 꼭짓점을 누를 수 있습니다" />
-          </div>
-          {step === "classify" ? (
-            <div>
-              <label htmlFor="solid-answer">새 도형의 이름</label>
-              <input id="solid-answer" data-testid="solid-answer-input" value={answer} onChange={(event) => setAnswer(event.target.value)} />
-              <div role="group" aria-label="도형 이름 선택">
-                {[...new Set(examples.map((item) => item.label))].map((label) => (
-                  <button key={label} type="button" data-testid={"solid-answer-" + label} onClick={() => setAnswer(label)}>{label}</button>
-                ))}
-              </div>
-              <button type="button" data-testid="solid-submit" onClick={classify}>분류 제출</button>
-            </div>
-          ) : (
-            <div>
-              <p data-testid="solid-parts-explanation">면은 도형의 넓은 겉면, 모서리는 두 면이 만나는 선, 꼭짓점은 세 모서리가 만나는 점입니다.</p>
-              {KINDS.map((kind) => (
-                <div key={kind}>
-                  <h3>{kind === "face" ? "면" : kind === "edge" ? "모서리" : "꼭짓점"}</h3>
-                  {parts[kind].map((id) => (
-                    <button key={id} type="button" data-testid={"solid-part-" + id} aria-pressed={selectedIds.includes(id)} onClick={() => togglePart(id)}>{id}</button>
-                  ))}
-                </div>
-              ))}
-              <p data-testid="solid-selected-count">선택 {selectedIds.length}개</p>
-              <button type="button" data-testid="solid-submit" onClick={() => emit(props.quizId ?? (step === "parts" ? QUIZ[1] : QUIZ[2]), gradeSelection(example, selectedIds))}>
-                {step === "parts" ? "구성 요소 제출" : "세기 제출"}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-      {feedback && (
-        <div data-testid="solid-feedback" role="status">
-          <p>{feedback.correct ? "정답입니다." : "오답입니다. 정답은 " + feedback.expected + "입니다."}</p>
-          {feedback.reasonCode && <p>{feedback.reasonCode}</p>}
-          {!feedback.correct && <button type="button" data-testid="solid-retry" onClick={() => { setAnswer(""); setSelectedIds([]); setFeedback(null); }}>다시 하기</button>}
-          {feedback.correct && callbacks.onAcknowledge && <button type="button" data-testid="solid-ack" onClick={() => callbacks.onAcknowledge?.(feedback.quizId)}>결과 확인</button>}
-        </div>
-      )}
-      {returnToMap && <button type="button" data-testid="solid-return-map" onClick={returnToMap}>지도로 돌아가기</button>}
-    </section>
+    <>
+      {/* prettier-ignore */}
+      <SolidLessonView step={step} examples={examples} exampleId={exampleId} scene={lessonScene.scene} pickables={lessonScene.pickables} parts={parts} answer={answer} selectedIds={selectedIds} onExample={selectExample} onAnswer={setAnswer} onPick={selectPart} onClassify={classify} onCount={countParts} />
+      {guidance ? (
+        <p data-testid="solid-selection-guidance" role="status">
+          {guidance}
+        </p>
+      ) : null}
+    </>
   );
 }
 
 export function createSolidLessonView(props: Props): ReactElement {
   return <SolidLesson {...props} />;
 }
+
 export default SolidLesson;
