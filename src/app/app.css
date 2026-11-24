@@ -1,0 +1,103 @@
+:root {
+  --font-body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-pixel: ui-monospace, "SFMono-Regular", "Consolas", "Malgun Gothic", monospace;
+  --color-background: #f5f7fc;
+  --color-ink: #1d2a3c;
+  --color-accent: #2f6feb;
+  --color-success: #167c4b;
+  --color-error: #a3261a;
+  --touch-min: 44px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body {
+  background: var(--color-background); color: var(--color-ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  -webkit-text-size-adjust: 100%; overflow-wrap: anywhere; word-break: keep-all;
+}
+button, [role="button"] { font: inherit; }
+button { min-width: var(--touch-min); min-height: var(--touch-min); padding: 10px 16px; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.app-shell { display: flex; min-height: 100vh; flex-direction: column; }
+.app-header { padding: 16px clamp(16px, 4vw, 32px); border-bottom: 2px solid #d8e2f2; background: #ffffff; }
+.app-main { flex: 1; width: 100%; max-width: 1120px; margin: 0 auto; padding: 20px clamp(16px, 4vw, 32px) 32px; overflow-x: hidden; }
+.app-footer { padding: 12px clamp(16px, 4vw, 32px); border-top: 1px solid #d8e2f2; color: #4b5b72; font-size: 0.9rem; }
+.pixel-title { margin: 0 0 8px; color: #17345f; font-family: var(--font-pixel); font-size: clamp(1.15rem, 2.5vw, 1.6rem); letter-spacing: 0.04em; line-height: 1.35; text-shadow: 2px 2px 0 #cfe0ff; }
+.body-copy, p { overflow-wrap: anywhere; word-break: keep-all; }
+.notice, .storage-notice { margin: 12px 0; padding: 12px 16px; border: 2px solid #f0c95a; border-radius: 10px; background: #fff9e6; color: #5b4300; }
+.storage-notice { border-color: var(--color-error); background: #fff1ee; color: var(--color-error); }
+
+.touch-target, .btn { display: inline-flex; min-width: var(--touch-min); min-height: var(--touch-min); align-items: center; justify-content: center; gap: 8px; border: 2px solid #9fb3d1; border-radius: 12px; background: #ffffff; color: var(--color-ink); font-weight: 700; text-decoration: none; touch-action: manipulation; }
+.btn--primary { border-color: var(--color-accent); background: var(--color-accent); color: #ffffff; }
+.btn--selected { border-style: double; border-width: 4px; background: #e8f0ff; }
+.touch-target:focus-visible, .btn:focus-visible, button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #f2a900; outline-offset: 3px; }
+
+.map-layout, .lesson-layout, .fold-layout { display: grid; min-width: 0; gap: 16px; }
+.map-stage, .place-list, .lesson-panel, .viewport-frame, .gallery, .gallery__message, .gallery__back, .board-grid { min-width: 0; }
+.map-stage { min-height: 260px; border: 2px solid #b8c9e4; border-radius: 16px; background: #dce9ff; }
+.place-list, .choice-grid, .gallery-grid { display: grid; min-width: 0; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.place-card, .choice-card { min-width: 0; min-height: calc(var(--touch-min) * 2); padding: 12px; border: 2px solid #9fb3d1; border-radius: 14px; background: #ffffff; color: var(--color-ink); text-align: left; touch-action: manipulation; }
+.place-card--recommended { border-style: double; border-width: 5px; border-color: #d18b00; background: #fff9e6; }
+.place-card--completed { border-style: solid; border-color: var(--color-success); box-shadow: inset 0 0 0 3px #d8f3e5; }
+.empty-state, .gallery__message { padding: 20px 16px; border: 2px dashed #9fb3d1; border-radius: 12px; background: #ffffff; color: #35506f; }
+
+.lesson-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.lesson-steps li { min-width: var(--touch-min); min-height: var(--touch-min); padding: 8px 12px; border: 1px solid #9fb3d1; border-radius: 999px; background: #ffffff; }
+.lesson-panel { padding: 16px; border: 2px solid #d8e2f2; border-radius: 14px; background: #ffffff; }
+.feedback-panel, .feedback-panel--success, .feedback-panel--retry { padding: 16px; border: 3px solid #9fb3d1; border-radius: 14px; background: #ffffff; }
+.feedback-panel--success { border-style: double; border-color: var(--color-success); }
+.feedback-panel--retry { border-style: dashed; border-color: var(--color-error); }
+.feedback-hint { font-weight: 700; }
+.feedback-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+.viewport-frame, .viewport { min-height: 240px; overflow: hidden; border: 2px solid #9fb3d1; border-radius: 14px; background: #eaf1fb; }
+.viewport-empty { padding: 16px; }
+.viewport-error { position: absolute; inset: 8px; z-index: 1; padding: 16px; border: 3px dashed var(--color-error); border-radius: 12px; background: #fff1ee; color: var(--color-error); }
+.board-grid { grid-template-columns: minmax(0, 1fr); }
+.board-svg, .net-grid, .sketch-board-svg { display: block; width: 100%; height: auto; max-height: 60vh; touch-action: none; }
+.net-cell { fill: #ffffff; stroke: #c6d4e8; }
+.net-face-shape { fill: #dce9ff; stroke: #2f6feb; stroke-width: 0.06; }
+.net-edge-hit, .net-vertex-hit, [data-highlighted-2d], .is-highlighted { fill: #ffd166; stroke: #8a5a00; }
+.net-board-actions, .sketch-style-controls, .gallery__header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.face-palette-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.face-palette { min-width: var(--touch-min); min-height: var(--touch-min); padding: 8px; border: 2px solid #9fb3d1; border-radius: 10px; background: #ffffff; }
+.gallery__header { justify-content: space-between; }
+.gallery__status, .sketch-board-status { margin: 0; font-weight: 700; }
+.gallery__back { display: inline-flex; align-items: center; justify-content: center; margin-top: 16px; }
+
+@media (min-width: 768px) {
+  .map-layout, .lesson-layout, .fold-layout, .board-grid { grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); }
+}
+@media (max-width: 480px) {
+  .app-main { padding-inline: 12px; }
+  .place-list, .choice-grid, .gallery-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* 실제 화면이 사용하는 클래스·data 속성도 같은 공통 계약에 연결한다. */
+.app { display: flex; min-height: 100vh; flex-direction: column; padding: 0 clamp(16px, 4vw, 32px) 24px; }
+.app__notice, [data-testid="storage-notice"] { margin: 12px 0; padding: 12px 16px; border: 2px solid var(--color-error); border-radius: 10px; background: #fff1ee; color: var(--color-error); overflow-wrap: anywhere; word-break: keep-all; }
+[data-testid="map"] { min-width: 0; padding: 16px; }
+[data-testid="map-places"] { display: grid; min-width: 0; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+[data-testid="map-place"] { display: flex; min-width: 0; min-height: var(--touch-min); flex-direction: column; align-items: stretch; gap: 6px; touch-action: manipulation; }
+[data-testid="map-place"][data-recommended="true"] { border-style: double; border-width: 5px; border-color: #d18b00; }
+[data-testid="map-place"][data-completed="true"] { border-style: solid; border-color: var(--color-success); box-shadow: inset 0 0 0 3px #d8f3e5; }
+[data-testid="map-gallery"] { min-height: var(--touch-min); touch-action: manipulation; }
+[data-testid="map-empty"], [data-testid="map-error"] { overflow-wrap: anywhere; word-break: keep-all; }
+.gallery, .net-board-root, .sketch-board, .fold-view { display: grid; min-width: 0; gap: 12px; }
+[aria-label="주제 학습"] { display: grid; min-width: 0; gap: 16px; }
+[aria-label="결과 확인"], [aria-label="완료 블록"] { padding: 16px; border: 3px solid #9fb3d1; border-radius: 14px; background: #ffffff; }
+.feedback-outcome, .fold-view__status, .net-face-label, .sketch-board-info, .sketch-style-note { overflow-wrap: anywhere; word-break: keep-all; }
+.fold-view__reasons { margin: 0; padding-left: 24px; }
+.fold-view__issue { fill: var(--color-error); }
+.net-grid { border: 1px solid #c6d4e8; border-radius: 10px; background: #ffffff; touch-action: none; }
+.net-face-label { fill: #17345f; font-size: 0.22px; }
+.sketch-board-status { min-height: var(--touch-min); }
+@media (max-width: 480px) {
+  [data-testid="map-places"] { grid-template-columns: minmax(0, 1fr); }
+}
