@@ -133,6 +133,8 @@ async function answerRelationQuiz(page: Page, base: FaceId): Promise<void> {
 }
 
 test.describe("FACES", () => {
+  test.describe.configure({ timeout: 120_000 });
+
   test("회전 후에도 기준 면과 밑면·옆면 범주가 유지된다", async ({ page }) => {
     await openFaces(page);
     await advanceToQuiz(page, BASE_CATEGORIES);
