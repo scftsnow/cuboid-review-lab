@@ -109,17 +109,35 @@ test("마지막 결과와 확인 여부가 복원되고 완료는 확인 후 표
   );
   await expect(step).toHaveAttribute("data-step", "faces-find");
   await expect(page.getByTestId("topic-complete")).toHaveCount(0);
-  const restored = await readSnapshot(page);
+
+  const restoredFeedback = page.getByRole("status", { name: "결과 확인" });
+  await expect(restoredFeedback).toBeVisible();
+  await expect(restoredFeedback).toContainText("다시 생각해 보세요");
+  await expect(
+    restoredFeedback.getByRole("list", { name: "수정 힌트" }),
+  ).toContainText("BASE_WRONG");
+  await expect(page.getByTestId("faces-submit")).toHaveCount(0);
+
+  const beforeAck = await readSnapshot(page);
   expect(
-    restored.topicStates.FACES?.quizzes["faces-base-check"]?.lastResult
+    beforeAck.topicStates.FACES?.quizzes["faces-base-check"]?.lastResult
       ?.reasonCodes,
   ).toEqual(["BASE_WRONG"]);
 
-  await page.getByTestId("face-option-fFront").tap();
-  await page.getByTestId("faces-submit").tap();
-  await expect(page.getByRole("status", { name: "결과 확인" })).toBeVisible();
-  await page.getByRole("button", { name: "계속" }).tap();
-  await expect(page.getByTestId("topic-complete")).toBeVisible();
+  await restoredFeedback.getByRole("button", { name: "계속" }).tap();
+  await expect(page.getByRole("status", { name: "결과 확인" })).toHaveCount(0);
+  const afterAck = await readSnapshot(page);
+  expect(
+    afterAck.topicStates.FACES?.quizzes["faces-base-check"]?.everAcknowledged,
+  ).toBe(true);
+  expect(
+    afterAck.topicStates.FACES?.quizzes["faces-base-check"]?.lastResult
+      ?.reasonCodes,
+  ).toEqual(["BASE_WRONG"]);
+
+  const topicComplete = page.getByTestId("topic-complete");
+  await expect(topicComplete).toHaveCount(1);
+  await expect(topicComplete).toBeVisible();
 
   await page.reload();
   await openPlace(page, "FACES");
@@ -127,6 +145,9 @@ test("마지막 결과와 확인 여부가 복원되고 완료는 확인 후 표
   const after = await readSnapshot(page);
   expect(
     after.topicStates.FACES?.quizzes["faces-base-check"]?.everAcknowledged,
+  ).toBe(true);
+  expect(
+    after.topicStates.FACES?.quizzes["faces-relation-check"]?.everAcknowledged,
   ).toBe(true);
 });
 
