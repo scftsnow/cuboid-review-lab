@@ -9,7 +9,9 @@ const FEEDBACK_NAME = "결과 확인";
 type StepId = "solid-intro" | "solid-classify" | "solid-parts" | "solid-count";
 
 async function expectStep(page: Page, stepId: StepId): Promise<void> {
-  await expect(page.locator(PLAYER + "[data-step='" + stepId + "']")).toHaveCount(1);
+  await expect(
+    page.locator(PLAYER + "[data-step='" + stepId + "']"),
+  ).toHaveCount(1);
 }
 
 async function openSolid(page: Page): Promise<void> {
@@ -24,25 +26,39 @@ async function nextStep(page: Page): Promise<void> {
 }
 
 async function backToMap(page: Page): Promise<void> {
-  await page.locator(PLAYER).getByRole("button", { name: "지도로 돌아가기" }).last().click();
+  await page
+    .locator(PLAYER)
+    .getByRole("button", { name: "지도로 돌아가기" })
+    .last()
+    .click();
   await expect(page.locator(MAP)).toBeVisible();
 }
 
-async function expectPlaceComplete(page: Page, complete: boolean): Promise<void> {
+async function expectPlaceComplete(
+  page: Page,
+  complete: boolean,
+): Promise<void> {
   await expect(page.locator(SOLID_PLACE)).toHaveAttribute(
     "data-completed",
     complete ? "true" : "false",
   );
 }
 
-async function expectFeedback(page: Page, outcome: "correct" | "incorrect"): Promise<void> {
+async function expectFeedback(
+  page: Page,
+  outcome: "correct" | "incorrect",
+): Promise<void> {
   const feedback = page.getByRole("status", { name: FEEDBACK_NAME });
   await expect(feedback).toBeVisible();
-  await expect(feedback).toContainText(outcome === "correct" ? "정답입니다" : "다시 생각해 보세요");
+  await expect(feedback).toContainText(
+    outcome === "correct" ? "정답입니다" : "다시 생각해 보세요",
+  );
 }
 
 async function expectNoFeedback(page: Page): Promise<void> {
-  await expect(page.getByRole("status", { name: FEEDBACK_NAME })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: FEEDBACK_NAME })).toHaveCount(
+    0,
+  );
 }
 
 async function submitClassification(
@@ -101,10 +117,6 @@ test("classify wrong answer shows a hint and retry reaches a pending correct res
 test("empty classification answer should not store a pending result", async ({
   page,
 }) => {
-  test.fixme(
-    true,
-    "확인된 제품 결함: 정육면체 분류에서 예제와 답을 선택하지 않고 분류 제출을 누르면 확인 대기 오답 결과가 저장된다.",
-  );
   await openSolid(page);
   await nextStep(page);
   await page.getByTestId("solid-submit").click();
@@ -121,12 +133,19 @@ test("unacknowledged count result does not complete the topic", async ({
   await nextStep(page);
   await submitClassification(page, "정육면체", true);
   await acknowledge(page, "solid-parts");
+  await nextStep(page);
+  await expectStep(page, "solid-count");
 
   await submitCount(page, true);
   await expectFeedback(page, "correct");
   await expect(page.locator(COMPLETION)).toHaveCount(0);
-  await backToMap(page);
+  await page.reload();
+  await expect(page.locator(MAP)).toBeVisible();
   await expectPlaceComplete(page, false);
+  await page.locator(SOLID_PLACE).click();
+  await expectStep(page, "solid-count");
+  await expectFeedback(page, "correct");
+  await expect(page.locator(COMPLETION)).toHaveCount(0);
 });
 
 test("one completion block appears after both acknowledgements and survives resubmission", async ({
@@ -136,6 +155,8 @@ test("one completion block appears after both acknowledgements and survives resu
   await nextStep(page);
   await submitClassification(page, "정육면체", true);
   await acknowledge(page, "solid-parts");
+  await nextStep(page);
+  await expectStep(page, "solid-count");
   await submitCount(page, true);
   await expectFeedback(page, "correct");
   await expect(page.locator(COMPLETION)).toHaveCount(0);
@@ -158,21 +179,23 @@ test("one completion block appears after both acknowledgements and survives resu
 test("an unacknowledged result should be restored after reload", async ({
   page,
 }) => {
-  test.fixme(
-    true,
-    "확인된 제품 결함: 개수 세기 결과를 제출하고 확인하지 않은 채 지도로 돌아간 뒤 reload하면 같은 단계는 열리지만 확인 대기 결과 화면이 복원되지 않는다.",
-  );
   await openSolid(page);
   await nextStep(page);
   await submitClassification(page, "정육면체", true);
   await acknowledge(page, "solid-parts");
+  await nextStep(page);
+  await expectStep(page, "solid-count");
   await submitCount(page, true);
-  await backToMap(page);
-  await page.reload();
-  await page.locator(SOLID_PLACE).click();
-  await expectStep(page, "solid-parts");
   await expectFeedback(page, "correct");
   await expect(page.locator(COMPLETION)).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(MAP)).toBeVisible();
+  await page.locator(SOLID_PLACE).click();
+  await expectStep(page, "solid-count");
+  await expectFeedback(page, "correct");
+  await expect(page.locator(COMPLETION)).toHaveCount(0);
+  await page.getByRole("button", { name: "계속" }).click();
+  await expect(page.locator(COMPLETION)).toHaveCount(1);
 });
 
 async function refuseWrites(page: Page): Promise<void> {
@@ -198,10 +221,6 @@ test("write refusal keeps current feedback usable", async ({ page }) => {
 test("write refusal should warn that progress cannot be restored", async ({
   page,
 }) => {
-  test.fixme(
-    true,
-    "확인된 제품 결함: 저장 쓰기가 거부된 상태에서 분류 결과를 제출하면 현재 탭 피드백은 유지되지만 복원 불가 안내가 화면에 표시되지 않는다.",
-  );
   await refuseWrites(page);
   await openSolid(page);
   await nextStep(page);
