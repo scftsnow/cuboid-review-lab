@@ -32,8 +32,9 @@ export type SolidLessonResult = Result;
 export type SolidLessonCallbacks = Callbacks;
 export type SolidLessonProps = Props;
 
-const STEPS = ["definition", "classify", "parts", "count", "result"] as const;
-const QUIZ = ["solid-classify", "solid-parts", "solid-count"] as const;
+const CLASSIFY_QUIZ = "solid-classify-check";
+const COUNT_QUIZ = "solid-count-check";
+const QUIZ = [CLASSIFY_QUIZ, COUNT_QUIZ] as const;
 const KINDS = ["face", "edge", "vertex"] as const;
 
 function lessonStep(id?: string): SolidLessonStep {
@@ -47,20 +48,14 @@ function lessonStep(id?: string): SolidLessonStep {
 function checkTopic(spec?: TopicSpec): boolean {
   const topic = spec ?? (TOPICS.SOLID as TopicSpec);
   const id = topic.topicId ?? topic.id ?? "";
-  const steps = topic.stepIds ?? topic.steps ?? STEPS;
   const quizzes = [
     ...(topic.quizzes ?? []).map((quiz) => quiz.id ?? quiz.stepId ?? ""),
     ...(topic.requiredQuizIds ?? []),
   ];
-  const canonical = QUIZ.every((quizId) => quizzes.includes(quizId));
-  const shared =
-    ["classify", "parts", "count"].every((name) =>
-      steps.some((stepId) => stepId.includes("solid-" + name)),
-    ) &&
-    ["classify", "count"].every((name) =>
-      quizzes.some((quizId) => quizId.includes("solid-" + name)),
-    );
-  return (id === "solid" || id === "SOLID") && (canonical || shared);
+  return (
+    (id === "solid" || id === "SOLID") &&
+    QUIZ.every((quizId) => quizzes.includes(quizId))
+  );
 }
 
 function topologyParts(example: SolidExample | null): SolidLessonParts {
@@ -167,7 +162,7 @@ export function SolidLesson(props: Props): ReactElement {
   function emit(quizId: string, value: Submission) {
     const result: Result = {
       ...value,
-      quizId: props.quizId ?? quizId,
+      quizId,
       contractQuizId: quizId,
       reason: value.reasonCode ?? undefined,
       hint: value.correct
@@ -184,7 +179,7 @@ export function SolidLesson(props: Props): ReactElement {
     }
     setGuidance("");
     const correct = answer.trim() === expected;
-    emit(QUIZ[0], {
+    emit(props.quizId ?? CLASSIFY_QUIZ, {
       correct,
       expected,
       selectedIds: [],
@@ -193,17 +188,16 @@ export function SolidLesson(props: Props): ReactElement {
   }
 
   function countParts() {
+    if (step !== "count") {
+      setGuidance("구성 요소를 찾아 보세요. 세기 단계에서 제출합니다.");
+      return;
+    }
     setGuidance("");
-    const quizId = step === "parts" ? QUIZ[1] : QUIZ[2];
-    emit(quizId, gradeSelection(example, selectedIds));
+    emit(props.quizId ?? COUNT_QUIZ, gradeSelection(example, selectedIds));
   }
 
   function selectPart(id: string | null) {
-    if (!id || !interactiveIds.has(id)) return;
-    if (selectedIds.includes(id)) {
-      emit(props.quizId ?? QUIZ[2], gradeSelection(example, selectedIds));
-      return;
-    }
+    if (!id || !interactiveIds.has(id) || selectedIds.includes(id)) return;
     setSelectedIds([...selectedIds, id]);
   }
 
@@ -226,6 +220,7 @@ export function SolidLesson(props: Props): ReactElement {
     );
   }
 
+  // SolidLessonView가 Viewport에 장면과 안정적인 picking ID를 전달한다.
   return (
     <>
       {/* prettier-ignore */}
